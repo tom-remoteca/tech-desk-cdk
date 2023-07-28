@@ -7,7 +7,7 @@ from aws_cdk import aws_certificatemanager as acm
 from aws_cdk import aws_route53_targets as targets
 
 from constructs import Construct
-from aws_cdk import CfnOutput, Stack, SecretValue
+from aws_cdk import CfnOutput, Stack, SecretValue, BundlingOptions, DockerImage
 
 import aws_cdk.aws_amplify_alpha as amplify
 
@@ -62,4 +62,33 @@ class APIStack(Stack):
             zone=hosted_zone,
             target=route53.RecordTarget.from_alias(
                 targets.ApiGateway(self.api)),
+        )  
+
+        custom_authorizer_lambda = _lambda.Function(
+            self, 'CustomAuthorizerFunction',
+            handler='handler.handler',
+            runtime=_lambda.Runtime.PYTHON_3_9,
+            code = _lambda.Code.from_asset(
+                f"{os.path.dirname(__file__)}/../lambdas/authorizer",
+                bundling=BundlingOptions(
+                    # image=_lambda.Runtime.PYTHON_3_9.bundling_image,
+                    image=DockerImage.from_registry("amazon/aws-sam-cli-build-image-python3.9"),
+                    command=[
+                        "bash", "-c",
+                        "pip install --no-cache -r requirements.txt -t /asset-output && cp -au . /asset-output"
+                    ],
+                ),
+            ),
         )
+
+        self.api_authorizer = apigateway.TokenAuthorizer(
+            self, 'MyAuthorizer',
+            handler=custom_authorizer_lambda,
+            identity_source=apigateway.IdentitySource.header('Authorization')
+        )
+
+        # self.api_auth = apigateway.CognitoUserPoolsAuthorizer(
+        #     self, "apiAuthoriser", cognito_user_pools=[user_pool]
+        # )
+        # self.api_auth_type = apigateway.AuthorizationType.COGNITO
+        # CfnOutput(self, "apiEndpoint", value=self.api.url)

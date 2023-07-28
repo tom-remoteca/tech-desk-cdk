@@ -45,8 +45,20 @@ class CoreStack(Stack):
                 name="SK", type=dynamodb.AttributeType.STRING),
             billing_mode=dynamodb.BillingMode.PAY_PER_REQUEST,
         )
+        table.add_global_secondary_index(
+            index_name="GSI1",
+            partition_key=dynamodb.Attribute(
+                name="GSI1PK",
+                type=dynamodb.AttributeType.STRING
+            ),
+            sort_key=dynamodb.Attribute(
+                name="GSI1SK",
+                type=dynamodb.AttributeType.STRING
+            )
+        )
         self.table = table
-        # USers Table
+
+        # Users Table
         users_table = dynamodb.Table(
             self,
             "UsersTable",
@@ -118,12 +130,6 @@ class CoreStack(Stack):
             self, "NextAuthUserSecretAccessKey",
             value=access_key.attr_secret_access_key
         )
-
-        # self.api_auth = apigateway.CognitoUserPoolsAuthorizer(
-        #     self, "apiAuthoriser", cognito_user_pools=[user_pool]
-        # )
-        # self.api_auth_type = apigateway.AuthorizationType.COGNITO
-        # CfnOutput(self, "apiEndpoint", value=self.api.url)
 
         ####### Amplify ######
 

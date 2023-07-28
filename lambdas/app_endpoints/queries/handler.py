@@ -12,30 +12,9 @@ from botocore.exceptions import ClientError
 
 # Create the DynamoDB client
 dynamodb = boto3.resource("dynamodb")
-auth_table = dynamodb.Table('next-auth')
 table = dynamodb.Table(os.environ["CORE_TABLE_NAME"])
 
 BUCKET_NAME = os.environ["BUCKET_NAME"]
-
-
-def auth(auth_header):
-    # Extract token from "Bearer td_tok"
-    td_tok = auth_header.split(" ")[1]
-
-    # Decode the base64 string
-    decoded_td_tok = base64.b64decode(td_tok).decode('utf-8')
-
-    # Split the string on " "
-    user_id, tenant_id, session_token = decoded_td_tok.split(" ")
-    print(user_id, tenant_id, session_token)
-    res = auth_table.query(
-        KeyConditionExpression=Key('PK').eq(f"USER#{user_id}") & Key(
-            'SK').begins_with(f"ACCOUNT#")
-    )
-    auth = res.get("Items", [])
-    print(auth)
-    return user_id, tenant_id
-
 
 def write_file_to_s3(query_id, file_data):
     # print(file_data)
@@ -109,6 +88,26 @@ def parse_raw_query(query_id, event):
     return out
 
 
+def create_query_dynamo(company_id, user_id, query_id, query_data):
+    if query_data['my_eyes_only']:
+        is_public = "TRUE"
+    else:
+        is_public = "FALSE"
+    
+    query_data['id'] = query_id
+    query_data['company_id'] = company_id
+
+    res = table.put_item(
+        Item={
+            'PK': f"COMPANY#{company_id}#USER#{user_id}",
+            'SK': f"QUERY#{query_id}",
+            'GSI1PK': f"COMPANY#{company_id}",
+            'GSI1SK': f"PUBLIC#{is_public}QUERY#{query_id}",
+            'query_data': query_data
+        }
+    )
+    return query_data
+
 def response(status_code, body):
     return {
         "statusCode": status_code,
@@ -123,15 +122,13 @@ def response(status_code, body):
 
 
 def handler(event, context):
-    user_id, tenant_id = auth(event['headers']['Authorization'])
-    print(user_id, tenantid)
     print(event)
-    return response(200, {"message": "successs"})
-    company_id = event.get("company_id", "company_EXAMPLE")
-    user_id = event.get("user_id", "user_EXAMPLE")
+    user_id = event['requestContext']['authorizer']['sub']
+    company_id = event['requestContext']['authorizer']['tenant_id']
 
     if event["httpMethod"] == "GET":
         return handle_get(company_id, user_id, event)
+        
     if event["httpMethod"] == "POST":
         return handle_post(company_id, user_id, event)
     return 200
@@ -141,21 +138,51 @@ def handle_post(company_id, user_id, event):
     query_id = f"query_{uuid.uuid4()}"
     print(query_id)
 
+    # Process data in webkit form and save attachments to s3
     parsed_query = parse_raw_query(query_id, event)
-    print(parsed_query)
+    
+    # Save this request to Dynamo
+    create_query_dynamo(company_id, user_id, query_id, parsed_query)
 
     return response(200, parsed_query)
 
 
 def handle_get(company_id, user_id, event):
-    res = table.query(
-        KeyConditionExpression=Key('PK').eq(f"COMPANY#{company_id}#QUERY") & Key(
-            'SK').begins_with(f"MEO#{user_id}#QUERY#")
+    # Define the primary key for user's own queries
+    primary_key_user = {
+        'PK': f'COMPANY#{company_id}#USER#{user_id}',
+    }
+
+    projection_expression = 'query_data.id, query_data.my_eyes_only, query_data.query_title, query_data.status'
+
+    # Execute the query for user's own queries
+    response_user = table.query(
+        KeyConditionExpression=boto3.dynamodb.conditions.Key('PK').eq(primary_key_user['PK']),
+        ProjectionExpression=projection_expression,
+
     )
-    queries = res.get("Items", [])
-    res = table.query(
-        KeyConditionExpression=Key('PK').eq(f"COMPANY#{company_id}#QUERY") & Key(
-            'SK').begins_with(f"MEO#FALSE#QUERY#")
+
+    # Define the primary key for public queries
+    primary_key_public = {
+        'GSI1PK': f'COMPANY#{company_id}',
+        'GSI1SK': f'PUBLIC#TRUE',
+    }
+
+    # Execute the query for public queries
+    response_public = table.query(
+        IndexName="GSI1",  # replace with your GSI name
+        KeyConditionExpression=boto3.dynamodb.conditions.Key('GSI1PK').eq(primary_key_public['GSI1PK']) & 
+                               boto3.dynamodb.conditions.Key('GSI1SK').begins_with(primary_key_public['GSI1SK']),
+        ProjectionExpression=projection_expression,
     )
-    queries.append(res.get("Items", []))
-    return [i['query'] for i in res.get('Items', [])]
+
+    # Extract the items (queries) from the responses and de-duplicate
+    items_user = response_user['Items']
+    items_public = response_public['Items']
+
+    query_ids = set([item['SK'] for item in items_user])
+    items_public = [item for item in items_public if item['SK'] not in query_ids]
+
+    items = items_user + items_public
+
+    return items

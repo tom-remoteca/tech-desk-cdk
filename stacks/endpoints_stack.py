@@ -13,6 +13,7 @@ class EndpointsStack(Stack):
         scope: Stack,
         id: str,
         api,
+        api_authorizer,
         next_auth_table,
         core_table,
         core_bucket,
@@ -44,9 +45,11 @@ class EndpointsStack(Stack):
         queries_api.add_method(
             "GET",
             apigateway.LambdaIntegration(queries_lambda),
+            authorizer=api_authorizer
         )
 
         queries_api.add_method(
             "POST",
             apigateway.LambdaIntegration(queries_lambda),
+            authorizer=api_authorizer
         )
