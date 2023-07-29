@@ -46,17 +46,19 @@ def handler(event, context):
         parsed_token = get_token(jwt)
     except Exception as e:
         # Invalid JWT, deny access.
+        print("INVALID TOKEN")
         return generate_policy(token, "Deny", method_arn)
 
     if parsed_token["exp"] < int(time.time()):
         # Token has expired, deny access
+        print("EXPIRED TOKEN")
         return generate_policy(token, "Deny", method_arn)
     
     
     return generate_policy(token, "Allow", method_arn, parsed_token)
 
 
-def generate_policy(principal_id, effect, resource, parsed_token):
+def generate_policy(principal_id, effect, resource, parsed_token={}):
     return {
         "principalId": principal_id,
         "policyDocument": {

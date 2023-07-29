@@ -3,6 +3,7 @@ import cgi
 import json
 import uuid
 import boto3
+import time
 import base64
 from io import BytesIO
 
@@ -95,6 +96,8 @@ def create_query_dynamo(company_id, user_id, query_id, query_data):
         is_public = "FALSE"
     
     query_data['id'] = query_id
+    query_data['date_submitted'] = str(time.time())
+    query_data['query_status'] = "Submitted"
     query_data['company_id'] = company_id
 
     res = table.put_item(
@@ -117,7 +120,7 @@ def response(status_code, body):
             "Access-Control-Allow-Origin": "*",
             "Access-Control-Allow-Methods": "OPTIONS,POST,GET",
         },
-        "body": json.dumps(body)
+        "body": json.dumps(body, default=str)
     }
 
 
@@ -153,7 +156,7 @@ def handle_get(company_id, user_id, event):
         'PK': f'COMPANY#{company_id}#USER#{user_id}',
     }
 
-    projection_expression = 'query_data.id, query_data.my_eyes_only, query_data.query_title, query_data.status'
+    projection_expression = 'SK, query_data.id, query_data.my_eyes_only, query_data.query_title, query_data.query_status, query_data.date_submitted'
 
     # Execute the query for user's own queries
     response_user = table.query(
@@ -185,4 +188,6 @@ def handle_get(company_id, user_id, event):
 
     items = items_user + items_public
 
-    return items
+    res = [item['query_data'] for item in items]
+
+    return response(200, res)
