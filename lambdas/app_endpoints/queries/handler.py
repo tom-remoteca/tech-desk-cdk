@@ -90,13 +90,15 @@ def parse_raw_query(query_id, event):
 
 
 def create_query_dynamo(company_id, user_id, query_id, query_data):
-    if query_data['my_eyes_only']:
+    print(query_data)
+    if query_data['is_public'] == "true":
         is_public = "TRUE"
     else:
         is_public = "FALSE"
+        
     
     query_data['id'] = query_id
-    query_data['date_submitted'] = str(time.time())
+    query_data['date_submitted'] = str(int(time.time()))
     query_data['query_status'] = "Submitted"
     query_data['company_id'] = company_id
 
@@ -128,7 +130,7 @@ def handler(event, context):
     print(event)
     user_id = event['requestContext']['authorizer']['sub']
     company_id = event['requestContext']['authorizer']['tenant_id']
-
+    print(user_id)
     if event["httpMethod"] == "GET":
         return handle_get(company_id, user_id, event)
         
@@ -156,7 +158,7 @@ def handle_get(company_id, user_id, event):
         'PK': f'COMPANY#{company_id}#USER#{user_id}',
     }
 
-    projection_expression = 'SK, query_data.id, query_data.my_eyes_only, query_data.query_title, query_data.query_status, query_data.date_submitted'
+    projection_expression = 'SK, query_data.id, query_data.is_public, query_data.query_title, query_data.query_status, query_data.date_submitted'
 
     # Execute the query for user's own queries
     response_user = table.query(
