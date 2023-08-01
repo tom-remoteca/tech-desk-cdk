@@ -91,7 +91,7 @@ def parse_raw_query(query_id, event):
             continue
         elif k == "usecase_tags":
             raw_tags = json.loads(v)
-            tags = [obj["value"] for obj in raw_tags]
+            tags = [obj["label"] for obj in raw_tags]
             out["usecase_tags"] = tags
         else:
             out[k] = v

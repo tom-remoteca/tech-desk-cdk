@@ -25,15 +25,11 @@ def response(status_code, body={}):
 
 
 def handler(event, context):
-    print(event)
-
     # Get Query ID from Path & MEO from URLarg
     query_id = event["pathParameters"]["query_id"]
-    is_public = event["multiValueQueryStringParameters"]["is_public"]
+    is_public = event["multiValueQueryStringParameters"]["is_public"][0]
     user_id = event["requestContext"]["authorizer"]["sub"]
     company_id = event["requestContext"]["authorizer"]["tenant_id"]
-    print(user_id, company_id, query_id, is_public)
-
     if event["httpMethod"] == "GET":
         return handle_get(
             company_id, user_id, query_id=query_id, is_public=is_public
@@ -45,13 +41,11 @@ def handler(event, context):
 
 
 def handle_get(company_id, user_id, query_id: str, is_public: bool):
-    if is_public:
-        print("doing public")
+    if is_public == "true":
         primary_key_public = {
             "GSI1PK": f"COMPANY#{company_id}",
             "GSI1SK": f"PUBLIC#TRUEQUERY#{query_id}",
         }
-        print(primary_key_public)
         res = table.query(
             IndexName="GSI1",
             KeyConditionExpression=Key("GSI1PK").eq(
@@ -59,14 +53,15 @@ def handle_get(company_id, user_id, query_id: str, is_public: bool):
             )
             & Key("GSI1SK").eq(primary_key_public["GSI1SK"]),
         )
-    else:
+    elif is_public == "false":
         primary_key_private = {
             "PK": f"COMPANY#{company_id}#USER#{user_id}",
             "SK": f"QUERY#{query_id}",
         }
+        print(primary_key_private)
         res = table.query(
             KeyConditionExpression=Key("PK").eq(primary_key_private["PK"])
             & Key("SK").eq(primary_key_private["SK"]),
         )
-    print(res["Items"][0])
+        print(res["Items"])
     return response(200, res["Items"][0]["query_data"])
