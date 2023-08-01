@@ -31,9 +31,13 @@ class EndpointsStack(Stack):
             ),
             environment={
                 "CORE_TABLE_NAME": core_table.table_name,
-                "BUCKET_NAME": core_bucket.bucket_name
+                "BUCKET_NAME": core_bucket.bucket_name,
             },
         )
+
+        core_table.grant_read_write_data(queries_lambda)
+        next_auth_table.grant_read_data(queries_lambda)
+        core_bucket.grant_put(queries_lambda)
 
         query_lambda = _lambda.Function(
             self,
@@ -45,13 +49,12 @@ class EndpointsStack(Stack):
             ),
             environment={
                 "CORE_TABLE_NAME": core_table.table_name,
-                "BUCKET_NAME": core_bucket.bucket_name
+                "BUCKET_NAME": core_bucket.bucket_name,
             },
         )
 
-        core_table.grant_read_write_data(queries_lambda)
-        next_auth_table.grant_read_data(queries_lambda)
-        core_bucket.grant_put(queries_lambda)
+        core_table.grant_read_write_data(query_lambda)
+        core_bucket.grant_put(query_lambda)
 
         queries_api = api.root.add_resource("queries")
         query_api = queries_api.add_resource("{query_id}")
@@ -60,17 +63,17 @@ class EndpointsStack(Stack):
         queries_api.add_method(
             "GET",
             apigateway.LambdaIntegration(queries_lambda),
-            authorizer=api_authorizer
+            authorizer=api_authorizer,
         )
 
         queries_api.add_method(
             "POST",
             apigateway.LambdaIntegration(queries_lambda),
-            authorizer=api_authorizer
+            authorizer=api_authorizer,
         )
 
         query_api.add_method(
             "GET",
             apigateway.LambdaIntegration(query_lambda),
-            authorizer=api_authorizer
+            authorizer=api_authorizer,
         )
