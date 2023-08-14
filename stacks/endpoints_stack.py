@@ -25,7 +25,7 @@ class EndpointsStack(Stack):
             self,
             "QueriesLambda",
             handler="handler.handler",
-            runtime=_lambda.Runtime.PYTHON_3_9,
+            runtime=_lambda.Runtime.PYTHON_3_7,
             code=_lambda.Code.from_asset(
                 f"{os.path.dirname(__file__)}/../lambdas/app_endpoints/queries"
             ),

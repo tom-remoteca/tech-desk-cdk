@@ -5,6 +5,7 @@ import uuid
 import boto3
 import time
 import base64
+import requests
 from io import BytesIO
 
 from boto3.dynamodb.conditions import Key
@@ -15,6 +16,31 @@ dynamodb = boto3.resource("dynamodb")
 table = dynamodb.Table(os.environ["CORE_TABLE_NAME"])
 
 BUCKET_NAME = os.environ["BUCKET_NAME"]
+
+
+def dict_to_html(d):
+    html_content = ""
+    for key, value in d.items():
+        html_content += f"<strong>{key}</strong>: {value}<br/>"
+    return html_content
+
+
+def create_query_freshdesk(parsed_query):
+    url = "https://remotecalimited.freshdesk.com/api/v2/tickets"
+    headers = {"Content-Type": "application/json"}
+    auth = ("CwDi38QwCfnAoWAFsy", "X")
+    ticket_desc = dict_to_html(parsed_query)
+    data = {
+        "description": ticket_desc,
+        "subject": f"{parsed_query['company_name']}: {parsed_query['query_title']}",
+        "email": "tom@remoteca.co.uk",
+        "priority": 1,
+        "status": 2,
+    }
+    response = requests.post(
+        url, headers=headers, auth=auth, data=json.dumps(data)
+    )
+    return
 
 
 def write_file_to_s3(query_id, file_data):
@@ -106,11 +132,6 @@ def create_query_dynamo(company_id, user_id, query_id, query_data):
     else:
         is_public = "FALSE"
 
-    query_data["id"] = query_id
-    query_data["date_submitted"] = str(int(time.time()))
-    query_data["query_status"] = "Submitted"
-    query_data["company_id"] = company_id
-
     table.put_item(
         Item={
             "PK": f"COMPANY#{company_id}#USER#{user_id}",
@@ -156,6 +177,23 @@ def handle_post(company_id, user_id, event):
 
     # Process data in webkit form and save attachments to s3
     parsed_query = parse_raw_query(query_id, event)
+    parsed_query["submittor_id"] = user_id
+    parsed_query["submittor_email"] = event["requestContext"]["authorizer"][
+        "email"
+    ]
+    parsed_query["company_name"] = event["requestContext"]["authorizer"][
+        "tenant_name"
+    ]
+    parsed_query["company_id"] = event["requestContext"]["authorizer"][
+        "tenant_id"
+    ]
+    parsed_query["id"] = query_id
+    parsed_query["date_submitted"] = str(int(time.time()))
+    parsed_query["query_status"] = "Submitted"
+    parsed_query["company_id"] = company_id
+
+    # Send Query to FreshDesk
+    create_query_freshdesk(parsed_query)
 
     # Save this request to Dynamo
     create_query_dynamo(company_id, user_id, query_id, parsed_query)
