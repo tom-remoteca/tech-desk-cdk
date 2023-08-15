@@ -2,7 +2,7 @@ from aws_cdk import aws_lambda as _lambda
 from aws_cdk import aws_apigateway as apigateway
 
 from constructs import Construct
-from aws_cdk import CfnOutput, Stack, SecretValue
+from aws_cdk import CfnOutput, Stack, SecretValue, Duration
 
 import os
 
@@ -20,6 +20,21 @@ class EndpointsStack(Stack):
         **kwargs,
     ) -> None:
         super().__init__(scope, id, **kwargs)
+
+        ai_lambda = _lambda.Function(
+            self,
+            "AILambda",
+            handler="handler.handler",
+            runtime=_lambda.Runtime.PYTHON_3_7,
+            code=_lambda.Code.from_asset(
+                f"{os.path.dirname(__file__)}/../lambdas/app_endpoints/ai"
+            ),
+            environment={
+                "CORE_TABLE_NAME": core_table.table_name,
+            },
+            timeout=Duration.seconds(60),
+        )
+        core_table.grant_read_write_data(ai_lambda)
 
         queries_lambda = _lambda.Function(
             self,
@@ -56,9 +71,16 @@ class EndpointsStack(Stack):
         core_table.grant_read_write_data(query_lambda)
         core_bucket.grant_put(query_lambda)
 
+        ai_api = api.root.add_resource("ai")
         queries_api = api.root.add_resource("queries")
         query_api = queries_api.add_resource("{query_id}")
         # activity_api = query_api.add_resource("activity")
+
+        ai_api.add_method(
+            "GET",
+            apigateway.LambdaIntegration(ai_lambda),
+            authorizer=api_authorizer,
+        )
 
         queries_api.add_method(
             "GET",
