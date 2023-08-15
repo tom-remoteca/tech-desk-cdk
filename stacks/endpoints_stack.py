@@ -21,20 +21,35 @@ class EndpointsStack(Stack):
     ) -> None:
         super().__init__(scope, id, **kwargs)
 
-        ai_lambda = _lambda.Function(
+        ai_query_lambda = _lambda.Function(
             self,
-            "AILambda",
+            "AIQueryLambda",
             handler="handler.handler",
             runtime=_lambda.Runtime.PYTHON_3_7,
             code=_lambda.Code.from_asset(
-                f"{os.path.dirname(__file__)}/../lambdas/app_endpoints/ai"
+                f"{os.path.dirname(__file__)}/../lambdas/app_endpoints/ai/new_query"
             ),
             environment={
                 "CORE_TABLE_NAME": core_table.table_name,
             },
             timeout=Duration.seconds(60),
         )
-        core_table.grant_read_write_data(ai_lambda)
+        core_table.grant_read_write_data(ai_query_lambda)
+
+        ai_history_lambda = _lambda.Function(
+            self,
+            "AIHistoryLambda",
+            handler="handler.handler",
+            runtime=_lambda.Runtime.PYTHON_3_7,
+            code=_lambda.Code.from_asset(
+                f"{os.path.dirname(__file__)}/../lambdas/app_endpoints/ai/history"
+            ),
+            environment={
+                "CORE_TABLE_NAME": core_table.table_name,
+            },
+            timeout=Duration.seconds(60),
+        )
+        core_table.grant_read_write_data(ai_history_lambda)
 
         queries_lambda = _lambda.Function(
             self,
@@ -72,13 +87,21 @@ class EndpointsStack(Stack):
         core_bucket.grant_put(query_lambda)
 
         ai_api = api.root.add_resource("ai")
+        ai_query = ai_api.add_resource("new_query")
+        ai_history = ai_api.add_resource("history")
         queries_api = api.root.add_resource("queries")
         query_api = queries_api.add_resource("{query_id}")
         # activity_api = query_api.add_resource("activity")
 
-        ai_api.add_method(
+        ai_query.add_method(
+            "POST",
+            apigateway.LambdaIntegration(ai_query_lambda),
+            authorizer=api_authorizer,
+        )
+
+        ai_history.add_method(
             "GET",
-            apigateway.LambdaIntegration(ai_lambda),
+            apigateway.LambdaIntegration(ai_history_lambda),
             authorizer=api_authorizer,
         )
 

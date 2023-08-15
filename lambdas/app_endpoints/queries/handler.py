@@ -164,7 +164,7 @@ def handler(event, context):
     company_id = event["requestContext"]["authorizer"]["tenant_id"]
     print(user_id)
     if event["httpMethod"] == "GET":
-        return handle_get(company_id, user_id, event)
+        return handle_get(company_id, user_id)
 
     if event["httpMethod"] == "POST":
         return handle_post(company_id, user_id, event)
@@ -201,10 +201,11 @@ def handle_post(company_id, user_id, event):
     return response(200, parsed_query)
 
 
-def handle_get(company_id, user_id, event):
+def handle_get(company_id, user_id):
     # Define the primary key for user's own queries
     primary_key_user = {
         "PK": f"COMPANY#{company_id}#USER#{user_id}",
+        "SK": "QUERY",
     }
 
     projection_expression = "SK, query_data.id, query_data.is_public, \
@@ -213,7 +214,8 @@ def handle_get(company_id, user_id, event):
 
     # Execute the query for user's own queries
     response_user = table.query(
-        KeyConditionExpression=Key("PK").eq(primary_key_user["PK"]),
+        KeyConditionExpression=Key("PK").eq(primary_key_user["PK"])
+        & Key("SK").begins_with(primary_key_user["SK"]),
         ProjectionExpression=projection_expression,
     )
 
