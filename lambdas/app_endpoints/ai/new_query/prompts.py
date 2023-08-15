@@ -51,7 +51,7 @@ def create_kwip_prompt(
 
     if models[model].get("kwip_source"):
         kwip_body["prompt"] = query
-        kwip_body["sources"] = models[model]["kwip_source"]
+        kwip_body["sources"] = [models[model]["kwip_source"]]
 
     return kwip_body
 
