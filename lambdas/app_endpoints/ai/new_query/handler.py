@@ -37,6 +37,7 @@ def log_query(
         "model": model,
         "query": query,
         "response": ai_response,
+        "ai_query_id": ai_query_id,
         "date": str(int(time.time())),
         "user": user,
         "user_id": user_id,

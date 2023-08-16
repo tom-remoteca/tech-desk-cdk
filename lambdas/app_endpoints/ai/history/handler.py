@@ -44,6 +44,6 @@ def handle_get(company_id, user_id):
     )
 
     # Extract the items (queries) from the responses and de-duplicate
-    users_ai_queries = res["Items"]
+    users_ai_queries = [item.get("ai_query_data") for item in res["Items"]]
 
     return response(200, users_ai_queries)
