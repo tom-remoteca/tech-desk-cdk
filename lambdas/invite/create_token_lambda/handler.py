@@ -10,9 +10,22 @@ dynamodb = boto3.resource("dynamodb")
 table = dynamodb.Table(os.environ["INVITE_TABLE_NAME"])
 
 
+def response(status_code, body={}):
+    return {
+        "statusCode": status_code,
+        "headers": {
+            "Content-Type": "application/json",
+            "Access-Control-Allow-Headers": "Content-Type",
+            "Access-Control-Allow-Origin": "*",
+            "Access-Control-Allow-Methods": "OPTIONS,POST,GET",
+        },
+        "body": json.dumps(body, default=str),
+    }
+
+
 def handler(event, context):
-    tenant_id = event.get("tenant_id", "company_exampleid1234567")
-    tenant_name = event.get("tenant_name", "Example Company")
+    tenant_id = event["requestContext"]["authorizer"]["tenant_id"]
+    tenant_name = event["requestContext"]["authorizer"]["tenant_name"]
 
     # Generate a UUID
     invite_token = str(uuid.uuid4())
@@ -33,13 +46,7 @@ def handler(event, context):
         table.put_item(Item=item)
     except ClientError as e:
         print(e.response["Error"]["Message"])
-        return {
-            "statusCode": 500,
-            "body": json.dumps("Error inserting item into DynamoDB"),
-        }
+        return response(500, "Error inserting item into DynamoDB")
 
     # Return the UUID and expiration time
-    return {
-        "statusCode": 200,
-        "body": json.dumps(item),
-    }
+    return response(200, item)

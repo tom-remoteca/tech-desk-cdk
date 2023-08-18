@@ -14,6 +14,7 @@ class InviteStack(Stack):
         scope: Stack,
         id: str,
         api,
+        api_authorizer,
         **kwargs,
     ) -> None:
         super().__init__(scope, id, **kwargs)
@@ -74,4 +75,5 @@ class InviteStack(Stack):
         create_invite_api.add_method(
             "GET",
             apigateway.LambdaIntegration(create_token_lambda),
+            authorizer=api_authorizer,
         )
