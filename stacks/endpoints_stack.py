@@ -140,6 +140,6 @@ class EndpointsStack(Stack):
 
         users_api.add_method(
             "GET",
-            apigateway.LambdaIntegration(query_lambda),
+            apigateway.LambdaIntegration(users_lambda),
             authorizer=api_authorizer,
         )
