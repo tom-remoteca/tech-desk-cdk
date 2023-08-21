@@ -55,6 +55,16 @@ class CoreStack(Stack):
             ),
             billing_mode=dynamodb.BillingMode.PAY_PER_REQUEST,
         )
+        users_table.add_global_secondary_index(
+            index_name="GSI1",
+            partition_key=dynamodb.Attribute(
+                name="GSI1PK", type=dynamodb.AttributeType.STRING
+            ),
+            # sort_key=dynamodb.Attribute(
+            #     name="GSI1SK", type=dynamodb.AttributeType.STRING
+            # ),
+        )
+        self.users_table = users_table
 
         ####### Next Auth Table ##########
         next_auth_table = dynamodb.Table(
@@ -80,8 +90,10 @@ class CoreStack(Stack):
             ),
         )
         self.next_auth_table = next_auth_table
+
         # Output the access key details
         CfnOutput(self, "NextAuthTableName", value=next_auth_table.table_name)
+
         # Create an IAM user
         next_auth_user = iam.User(
             self, "NextAuthUser2", user_name="next-auth-user-2"
@@ -105,33 +117,3 @@ class CoreStack(Stack):
             "NextAuthUserSecretAccessKey",
             value=access_key.attr_secret_access_key,
         )
-
-        ####### Amplify ######
-
-        # Create Amplify App, using the above repo as the code source.
-        # amplify_app = amplify.App(
-        #     self,
-        #     "TechDesk App",
-        #     source_code_provider=amplify.GitHubSourceCodeProvider(
-        #         owner=config['AMPLIFY_GIT_OWNER'],
-        #         repository=config['AMPLIFY_GIT_REPO'],
-        #         oauth_token=SecretValue.secrets_manager(
-        #             config['AMPLIFY_GIT_TOKEN_LOCATION']
-        #         ),
-        #     ),
-        # )
-
-        # cfn_amplify_app = amplify_app.node.default_child
-        # cfn_amplify_app.platform = 'WEB_COMPUTE'
-        # cfn_amplify_app.framework = "Next.js - SSR"
-
-        # amplify_app.add_custom_rule(
-        #     amplify.CustomRule.SINGLE_PAGE_APPLICATION_REDIRECT)
-
-        # mainBranch = amplify_app.add_branch(config['AMPLIFY_BRANCH'])
-        # cfn_amplify_branch = mainBranch.node.default_child
-        # cfn_amplify_branch.framework = "Next.js - SSR"
-
-        # domain = amplify_app.add_domain(config['DOMAIN_NAME'])
-        # domain.map_root(mainBranch),
-        # domain.map_sub_domain(mainBranch, "www")

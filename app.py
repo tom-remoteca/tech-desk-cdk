@@ -31,6 +31,7 @@ EndpointsStack(
     api=api_stack.api,
     api_authorizer=api_stack.api_authorizer,
     next_auth_table=core_stack.next_auth_table,
+    users_table=core_stack.users_table,
     core_table=core_stack.table,
     core_bucket=core_stack.bucket,
 )
