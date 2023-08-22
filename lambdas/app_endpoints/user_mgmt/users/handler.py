@@ -35,10 +35,6 @@ def handler(event, context):
 
 
 def handle_get(company_id):
-    projection_expression = "SK, query_data.id, query_data.is_public, \
-                            query_data.query_title, query_data.query_status, \
-                            query_data.date_submitted"
-
     # Define the primary key for public queries
     primary_key_public = {
         "GSI1PK": f"COMPANY#{company_id}",
@@ -48,7 +44,8 @@ def handle_get(company_id):
     res = table.query(
         IndexName="GSI1",  # replace with your GSI name
         KeyConditionExpression=Key("GSI1PK").eq(primary_key_public["GSI1PK"]),
-        ProjectionExpression=projection_expression,
+        ProjectionExpression="#N, image, email, #R, #I",  # email
+        ExpressionAttributeNames={"#N": "name", "#R": "role", "#I": "id"},
     )
     users = res.get("Items", [])
 
