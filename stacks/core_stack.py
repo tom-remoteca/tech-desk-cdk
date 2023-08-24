@@ -44,7 +44,6 @@ class CoreStack(Stack):
             ),
         )
         self.table = table
-
         # Users Table
         users_table = dynamodb.Table(
             self,
@@ -60,9 +59,9 @@ class CoreStack(Stack):
             partition_key=dynamodb.Attribute(
                 name="GSI1PK", type=dynamodb.AttributeType.STRING
             ),
-            # sort_key=dynamodb.Attribute(
-            #     name="GSI1SK", type=dynamodb.AttributeType.STRING
-            # ),
+            sort_key=dynamodb.Attribute(
+                name="GSI1SK", type=dynamodb.AttributeType.STRING
+            ),
         )
         self.users_table = users_table
 

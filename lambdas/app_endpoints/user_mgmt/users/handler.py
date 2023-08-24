@@ -36,14 +36,16 @@ def handler(event, context):
 
 def handle_get(company_id):
     # Define the primary key for public queries
-    primary_key_public = {
+    primary_key = {
         "GSI1PK": f"COMPANY#{company_id}",
+        "GSI1SK": f"USER#",
     }
 
     # Execute the query for public queries
     res = table.query(
         IndexName="GSI1",  # replace with your GSI name
-        KeyConditionExpression=Key("GSI1PK").eq(primary_key_public["GSI1PK"]),
+        KeyConditionExpression=Key("GSI1PK").eq(primary_key["GSI1PK"])
+        & Key("GSI1SK").begins_with(primary_key["GSI1SK"]),
         ProjectionExpression="#N, image, email, #R, #I",  # email
         ExpressionAttributeNames={"#N": "name", "#R": "role", "#I": "id"},
     )

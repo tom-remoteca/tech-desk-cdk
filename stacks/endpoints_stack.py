@@ -99,13 +99,25 @@ class EndpointsStack(Stack):
         )
         users_table.grant_read_data(users_lambda)
 
+        user_lambda = _lambda.Function(
+            self,
+            "UserLambda",
+            handler="handler.handler",
+            runtime=_lambda.Runtime.PYTHON_3_9,
+            code=_lambda.Code.from_asset(
+                f"{os.path.dirname(__file__)}/../lambdas/app_endpoints/user_mgmt/user"
+            ),
+            environment={"USERS_TABLE_NAME": users_table.table_name},
+        )
+        users_table.grant_read_write_data(user_lambda)
+
         ai_api = api.root.add_resource("ai")
         ai_query = ai_api.add_resource("new_query")
         ai_history = ai_api.add_resource("history")
         queries_api = api.root.add_resource("queries")
         query_api = queries_api.add_resource("{query_id}")
         users_api = api.root.add_resource("users")
-        # user_api = users_api.add_resource("{user_id}")
+        user_api = users_api.add_resource("{user_id}")
         # activity_api = query_api.add_resource("activity")
 
         ai_query.add_method(
@@ -141,5 +153,17 @@ class EndpointsStack(Stack):
         users_api.add_method(
             "GET",
             apigateway.LambdaIntegration(users_lambda),
+            authorizer=api_authorizer,
+        )
+
+        user_api.add_method(
+            "PUT",
+            apigateway.LambdaIntegration(user_lambda),
+            authorizer=api_authorizer,
+        )
+
+        user_api.add_method(
+            "DELETE",
+            apigateway.LambdaIntegration(user_lambda),
             authorizer=api_authorizer,
         )
