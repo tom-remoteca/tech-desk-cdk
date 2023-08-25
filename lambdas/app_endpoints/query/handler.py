@@ -28,7 +28,7 @@ def handler(event, context):
     # Get Query ID from Path & MEO from URLarg
     query_id = event["pathParameters"]["query_id"]
     is_public = event["multiValueQueryStringParameters"]["is_public"][0]
-    user_id = event["requestContext"]["authorizer"]["sub"]
+    user_id = event["requestContext"]["authorizer"]["user_id"]
     company_id = event["requestContext"]["authorizer"]["company_id"]
     if event["httpMethod"] == "GET":
         return handle_get(

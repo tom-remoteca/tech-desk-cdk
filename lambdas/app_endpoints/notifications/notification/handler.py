@@ -28,7 +28,7 @@ def response(status_code, body={}):
 def handler(event, context):
     print(event)
     company_id = event["requestContext"]["authorizer"]["company_id"]
-    user_id = event["requestContext"]["authorizer"]["sub"]
+    user_id = event["requestContext"]["authorizer"]["user_id"]
     notification_id = event["pathParameters"]["notification_id"]
 
     if event["httpMethod"] == "DELETE":
