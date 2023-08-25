@@ -29,7 +29,7 @@ def handler(event, context):
     query_id = event["pathParameters"]["query_id"]
     is_public = event["multiValueQueryStringParameters"]["is_public"][0]
     user_id = event["requestContext"]["authorizer"]["sub"]
-    company_id = event["requestContext"]["authorizer"]["tenant_id"]
+    company_id = event["requestContext"]["authorizer"]["company_id"]
     if event["httpMethod"] == "GET":
         return handle_get(
             company_id, user_id, query_id=query_id, is_public=is_public

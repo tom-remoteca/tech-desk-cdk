@@ -73,7 +73,7 @@ def handler(event, context):
     print(event)
     user_name = event["requestContext"]["authorizer"]["name"]
     user_id = event["requestContext"]["authorizer"]["sub"]
-    company_id = event["requestContext"]["authorizer"]["tenant_id"]
+    company_id = event["requestContext"]["authorizer"]["company_id"]
     if event["httpMethod"] == "POST":
         return handle_post(company_id, user_id, user_name, event)
     return 200

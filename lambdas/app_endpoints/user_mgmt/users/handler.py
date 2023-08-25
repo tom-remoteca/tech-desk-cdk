@@ -23,7 +23,7 @@ def response(status_code, body):
 
 def handler(event, context):
     print(event)
-    company_id = event["requestContext"]["authorizer"]["tenant_id"]
+    company_id = event["requestContext"]["authorizer"]["company_id"]
     is_admin = event["requestContext"]["authorizer"]["role"].lower() == "admin"
 
     if event["httpMethod"] == "GET":

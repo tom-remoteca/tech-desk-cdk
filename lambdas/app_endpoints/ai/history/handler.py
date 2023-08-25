@@ -24,7 +24,7 @@ def response(status_code, body):
 def handler(event, context):
     print(event)
     user_id = event["requestContext"]["authorizer"]["sub"]
-    company_id = event["requestContext"]["authorizer"]["tenant_id"]
+    company_id = event["requestContext"]["authorizer"]["company_id"]
     if event["httpMethod"] == "GET":
         return handle_get(company_id, user_id)
     return 200

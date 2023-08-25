@@ -161,7 +161,7 @@ def response(status_code, body):
 def handler(event, context):
     print(event)
     user_id = event["requestContext"]["authorizer"]["sub"]
-    company_id = event["requestContext"]["authorizer"]["tenant_id"]
+    company_id = event["requestContext"]["authorizer"]["company_id"]
     print(user_id)
     if event["httpMethod"] == "GET":
         return handle_get(company_id, user_id)
@@ -182,10 +182,10 @@ def handle_post(company_id, user_id, event):
         "email"
     ]
     parsed_query["company_name"] = event["requestContext"]["authorizer"][
-        "tenant_name"
+        "company_name"
     ]
     parsed_query["company_id"] = event["requestContext"]["authorizer"][
-        "tenant_id"
+        "company_id"
     ]
     parsed_query["id"] = query_id
     parsed_query["date_submitted"] = str(int(time.time()))

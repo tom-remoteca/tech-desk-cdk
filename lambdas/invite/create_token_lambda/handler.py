@@ -24,8 +24,8 @@ def response(status_code, body={}):
 
 
 def handler(event, context):
-    tenant_id = event["requestContext"]["authorizer"]["tenant_id"]
-    tenant_name = event["requestContext"]["authorizer"]["tenant_name"]
+    company_id = event["requestContext"]["authorizer"]["company_id"]
+    company_name = event["requestContext"]["authorizer"]["company_name"]
 
     # Generate a UUID
     invite_token = str(uuid.uuid4())
@@ -36,8 +36,8 @@ def handler(event, context):
     # Create the item
     item = {
         "inviteToken": invite_token,
-        "tenant_id": tenant_id,
-        "tenant_name": tenant_name,
+        "company_id": company_id,
+        "company_name": company_name,
         "expiration_time": expiration_time,
     }
 

@@ -27,7 +27,7 @@ def response(status_code, body={}):
 
 def handler(event, context):
     print(event)
-    company_id = event["requestContext"]["authorizer"]["tenant_id"]
+    company_id = event["requestContext"]["authorizer"]["company_id"]
     user_id = event["pathParameters"]["user_id"]
     is_admin = event["requestContext"]["authorizer"]["role"].lower() == "admin"
 

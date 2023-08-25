@@ -1,6 +1,5 @@
 import os
 import json
-import uuid
 import boto3
 from boto3.dynamodb.conditions import Key
 
@@ -24,7 +23,7 @@ def response(status_code, body):
 
 def handler(event, context):
     print(event)
-    company_id = event["requestContext"]["authorizer"]["tenant_id"]
+    company_id = event["requestContext"]["authorizer"]["company_id"]
     user_id = event["requestContext"]["authorizer"]["sub"]
     if event["httpMethod"] == "GET":
         return handle_get(company_id, user_id)
