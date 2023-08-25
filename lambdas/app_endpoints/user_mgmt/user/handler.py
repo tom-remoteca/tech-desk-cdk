@@ -29,19 +29,24 @@ def handler(event, context):
     print(event)
     company_id = event["requestContext"]["authorizer"]["company_id"]
     user_id = event["pathParameters"]["user_id"]
+
     is_admin = event["requestContext"]["authorizer"]["role"].lower() == "admin"
+    print(is_admin)
+    is_user = (
+        event["pathParameters"]["user_id"]
+        == event["requestContext"]["authorizer"]["user_id"]
+    )
+    print(is_user)
 
-    if not is_admin:
+    if is_admin or is_user:
+        if event["httpMethod"] == "PUT":
+            data = json.loads(event.get("body", {}))
+            return handle_put(company_id, user_id, data)
+
+        if event["httpMethod"] == "DELETE":
+            return handle_delete(company_id, user_id)
+    else:
         return response(403, "Admins only.")
-
-    if event["httpMethod"] == "PUT":
-        data = json.loads(event.get("body", {}))
-        return handle_put(company_id, user_id, data)
-
-    if event["httpMethod"] == "DELETE":
-        return handle_delete(company_id, user_id)
-
-    return response(200)
 
 
 def handle_put(company_id, user_id, data):
