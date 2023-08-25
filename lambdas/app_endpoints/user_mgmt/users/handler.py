@@ -23,9 +23,9 @@ def response(status_code, body):
 
 def handler(event, context):
     print(event)
-    user_id = event["requestContext"]["authorizer"]["sub"]
     company_id = event["requestContext"]["authorizer"]["tenant_id"]
-    is_admin = True
+    is_admin = event["requestContext"]["authorizer"]["role"].lower() == "admin"
+
     if event["httpMethod"] == "GET":
         if is_admin:
             return handle_get(company_id)

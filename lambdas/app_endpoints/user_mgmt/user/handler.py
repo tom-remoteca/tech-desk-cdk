@@ -29,7 +29,7 @@ def handler(event, context):
     print(event)
     company_id = event["requestContext"]["authorizer"]["tenant_id"]
     user_id = event["pathParameters"]["user_id"]
-    is_admin = True  # event["requestContext"]["authorizer"]["role"]
+    is_admin = event["requestContext"]["authorizer"]["role"].lower() == "admin"
 
     if not is_admin:
         return response(403, "Admins only.")
@@ -46,7 +46,6 @@ def handler(event, context):
 
 def handle_put(company_id, user_id, data):
     primary_key = {
-        "PK": f"USER#{user_id}",
         "GSI1PK": f"COMPANY#{company_id}",
         "GSI1SK": f"USER#{user_id}",
     }
@@ -91,19 +90,29 @@ def handle_put(company_id, user_id, data):
 
 
 def handle_delete(company_id, user_id):
-    # Constructing primary key
     primary_key = {
         "GSI1PK": f"COMPANY#{company_id}",
         "GSI1SK": f"USER#{user_id}",
     }
+    res = table.query(
+        IndexName="GSI1",
+        KeyConditionExpression=Key("GSI1PK").eq(primary_key["GSI1PK"])
+        & Key("GSI1SK").begins_with(primary_key["GSI1SK"]),
+    )
+    if not res.get("Items"):
+        return response(403, "User Not found OR not allowed to do this action")
+
+    primary_key = {
+        "PK": f"USER#{user_id}",
+    }
 
     # Making the delete call
-    response = table.delete_item(Key=primary_key)
+    res = table.delete_item(Key=primary_key)
 
-    print(response)
+    print(res)
 
     # Checking if the deletion was successful
-    if response.get("ResponseMetadata", {}).get("HTTPStatusCode") == 200:
+    if res.get("ResponseMetadata", {}).get("HTTPStatusCode") == 200:
         return response(200, "Deleted successfully.")
     else:
         return response(500, "Error occurred during deletion.")

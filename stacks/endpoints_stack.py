@@ -87,6 +87,34 @@ class EndpointsStack(Stack):
         core_table.grant_read_write_data(query_lambda)
         core_bucket.grant_put(query_lambda)
 
+        notifications_lambda = _lambda.Function(
+            self,
+            "NotificationsLambda",
+            handler="handler.handler",
+            runtime=_lambda.Runtime.PYTHON_3_7,
+            code=_lambda.Code.from_asset(
+                f"{os.path.dirname(__file__)}/../lambdas/app_endpoints/notifications/notifications"
+            ),
+            environment={
+                "CORE_TABLE_NAME": core_table.table_name,
+            },
+        )
+        core_table.grant_read_data(notifications_lambda)
+
+        notification_lambda = _lambda.Function(
+            self,
+            "NotificationLambda",
+            handler="handler.handler",
+            runtime=_lambda.Runtime.PYTHON_3_7,
+            code=_lambda.Code.from_asset(
+                f"{os.path.dirname(__file__)}/../lambdas/app_endpoints/notifications/notification"
+            ),
+            environment={
+                "CORE_TABLE_NAME": core_table.table_name,
+            },
+        )
+        core_table.grant_write_data(notification_lambda)
+
         users_lambda = _lambda.Function(
             self,
             "UsersLambda",
@@ -118,6 +146,8 @@ class EndpointsStack(Stack):
         query_api = queries_api.add_resource("{query_id}")
         users_api = api.root.add_resource("users")
         user_api = users_api.add_resource("{user_id}")
+        notifications_api = api.root.add_resource("notifications")
+        notification_api = notifications_api.add_resource("{notification_id}")
         # activity_api = query_api.add_resource("activity")
 
         ai_query.add_method(
@@ -165,5 +195,17 @@ class EndpointsStack(Stack):
         user_api.add_method(
             "DELETE",
             apigateway.LambdaIntegration(user_lambda),
+            authorizer=api_authorizer,
+        )
+
+        notifications_api.add_method(
+            "GET",
+            apigateway.LambdaIntegration(notifications_lambda),
+            authorizer=api_authorizer,
+        )
+
+        notification_api.add_method(
+            "DELETE",
+            apigateway.LambdaIntegration(notification_lambda),
             authorizer=api_authorizer,
         )

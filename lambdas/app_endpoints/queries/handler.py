@@ -168,7 +168,7 @@ def handler(event, context):
 
     if event["httpMethod"] == "POST":
         return handle_post(company_id, user_id, event)
-    return 200
+    return response(403, "Action not permitted")
 
 
 def handle_post(company_id, user_id, event):
