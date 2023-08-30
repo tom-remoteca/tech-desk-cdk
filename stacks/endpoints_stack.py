@@ -52,6 +52,21 @@ class EndpointsStack(Stack):
         )
         core_table.grant_read_write_data(ai_history_lambda)
 
+        get_ai_query_lambda = _lambda.Function(
+            self,
+            "GetAIQueryLambda",
+            handler="handler.handler",
+            runtime=_lambda.Runtime.PYTHON_3_7,
+            code=_lambda.Code.from_asset(
+                f"{os.path.dirname(__file__)}/../lambdas/app_endpoints/ai/get_ai_query"
+            ),
+            environment={
+                "CORE_TABLE_NAME": core_table.table_name,
+            },
+            timeout=Duration.seconds(60),
+        )
+        core_table.grant_read_data(get_ai_query_lambda)
+
         queries_lambda = _lambda.Function(
             self,
             "QueriesLambda",
@@ -142,6 +157,7 @@ class EndpointsStack(Stack):
         ai_api = api.root.add_resource("ai")
         ai_query = ai_api.add_resource("new_query")
         ai_history = ai_api.add_resource("history")
+        ai_query_history = ai_history.add_resource("{ai_query_id}")
         queries_api = api.root.add_resource("queries")
         query_api = queries_api.add_resource("{query_id}")
         users_api = api.root.add_resource("users")
@@ -159,6 +175,12 @@ class EndpointsStack(Stack):
         ai_history.add_method(
             "GET",
             apigateway.LambdaIntegration(ai_history_lambda),
+            authorizer=api_authorizer,
+        )
+
+        ai_query_history.add_method(
+            "GET",
+            apigateway.LambdaIntegration(get_ai_query_lambda),
             authorizer=api_authorizer,
         )
 
