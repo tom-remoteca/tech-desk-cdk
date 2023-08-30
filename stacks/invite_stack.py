@@ -63,9 +63,20 @@ class InviteStack(Stack):
 
         invite_table.grant_read_write_data(create_token_lambda)
 
+        contact_us_lambda = _lambda.Function(
+            self,
+            "ContactUsLambda",
+            handler="handler.handler",
+            runtime=_lambda.Runtime.PYTHON_3_7,
+            code=_lambda.Code.from_asset(
+                f"{os.path.dirname(__file__)}/../lambdas/app_endpoints/contact_us"
+            ),
+        )
+
         invite_api = api.root.add_resource("invite")
         lookup_invite_api = invite_api.add_resource("lookup")
         create_invite_api = invite_api.add_resource("create")
+        contact_api = api.root.add_resource("contact")
 
         lookup_invite_api.add_method(
             "GET",
@@ -76,4 +87,8 @@ class InviteStack(Stack):
             "GET",
             apigateway.LambdaIntegration(create_token_lambda),
             authorizer=api_authorizer,
+        )
+
+        contact_api.add_method(
+            "POST", apigateway.LambdaIntegration(contact_us_lambda)
         )
