@@ -31,12 +31,7 @@ def handler(event, context):
     user_id = event["requestContext"]["authorizer"]["user_id"]
     company_id = event["requestContext"]["authorizer"]["company_id"]
     if event["httpMethod"] == "GET":
-        return handle_get(
-            company_id, user_id, query_id=query_id, is_public=is_public
-        )
-
-    # if event["httpMethod"] == "POST":
-    #     return handle_post(company_id, user_id, event)
+        return handle_get(company_id, user_id, query_id=query_id, is_public=is_public)
     return response(200)
 
 
@@ -48,9 +43,7 @@ def handle_get(company_id, user_id, query_id: str, is_public: bool):
         }
         res = table.query(
             IndexName="GSI1",
-            KeyConditionExpression=Key("GSI1PK").eq(
-                primary_key_public["GSI1PK"]
-            )
+            KeyConditionExpression=Key("GSI1PK").eq(primary_key_public["GSI1PK"])
             & Key("GSI1SK").eq(primary_key_public["GSI1SK"]),
         )
     elif is_public == "false":

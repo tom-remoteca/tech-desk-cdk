@@ -34,5 +34,6 @@ EndpointsStack(
     users_table=core_stack.users_table,
     core_table=core_stack.table,
     core_bucket=core_stack.bucket,
+    activity_topic=core_stack.activity_topic,
 )
 app.synth()

@@ -5,9 +5,15 @@ from aws_cdk import aws_dynamodb as dynamodb
 from aws_cdk import aws_apigateway as apigateway
 from aws_cdk import aws_certificatemanager as acm
 from aws_cdk import aws_route53_targets as targets
-
+from aws_cdk import aws_logs as logs
 from constructs import Construct
-from aws_cdk import CfnOutput, Stack, SecretValue, BundlingOptions, DockerImage
+from aws_cdk import (
+    CfnOutput,
+    Stack,
+    SecretValue,
+    BundlingOptions,
+    DockerImage,
+)
 
 import aws_cdk.aws_amplify_alpha as amplify
 
@@ -39,6 +45,21 @@ class APIStack(Stack):
             validation=acm.CertificateValidation.from_dns(hosted_zone),
         )
 
+        # log_role = iam.Role(
+        #     self,
+        #     "ApiGatewayLoggingRole",
+        #     assumed_by=iam.ServicePrincipal("apigateway.amazonaws.com"),
+        # )
+
+        # log_role.add_managed_policy(
+        #     iam.ManagedPolicy.from_aws_managed_policy_name(
+        #         "service-role/AmazonAPIGatewayPushToCloudWatchLogs"
+        #     )
+        # )
+        # account = apigateway.CfnAccount(
+        #     self, "ApiGatewayAccount", cloud_watch_role_arn=log_role.role_arn
+        # )
+
         api = apigateway.RestApi(
             self,
             "backend-api",
@@ -51,40 +72,61 @@ class APIStack(Stack):
                 allow_origins=apigateway.Cors.ALL_ORIGINS,
                 allow_methods=apigateway.Cors.ALL_METHODS,
                 allow_headers=apigateway.Cors.DEFAULT_HEADERS,
-                allow_credentials=True
+                allow_credentials=True,
             ),
+            # deploy_options=apigateway.StageOptions(
+            #     access_log_destination=apigateway.LogGroupLogDestination(
+            #         log_group=logs.LogGroup(self, "ApiGatewayLogs")
+            #     ),
+            #     logging_level=apigateway.MethodLoggingLevel.INFO,
+            #     data_trace_enabled=True,
+            #     # tracing_enabled=True,
+            # ),
         )
+        # api.node.add_dependency(account)
+        api.rest_api_root_resource_id
+        api.rest_api_id
         self.api = api
         route53.ARecord(
             self,
             "APICustomDomainAliasRecord",
             record_name=f"api.{config['DOMAIN_NAME']}",
             zone=hosted_zone,
-            target=route53.RecordTarget.from_alias(
-                targets.ApiGateway(self.api)),
-        )  
+            target=route53.RecordTarget.from_alias(targets.ApiGateway(api)),
+        )
 
         custom_authorizer_lambda = _lambda.Function(
-            self, 'CustomAuthorizerFunction',
-            handler='handler.handler',
+            self,
+            "CustomAuthorizerFunction",
+            handler="handler.handler",
             runtime=_lambda.Runtime.PYTHON_3_9,
-            code = _lambda.Code.from_asset(
+            environment={
+                "REGION": self.region,
+                "ACCOUNT_ID": self.account,
+                "API_ID": api.rest_api_id,
+                "STAGE": "prod",
+            },
+            code=_lambda.Code.from_asset(
                 f"{os.path.dirname(__file__)}/../lambdas/authorizer",
                 bundling=BundlingOptions(
                     # image=_lambda.Runtime.PYTHON_3_9.bundling_image,
-                    image=DockerImage.from_registry("amazon/aws-sam-cli-build-image-python3.9"),
+                    image=DockerImage.from_registry(
+                        "amazon/aws-sam-cli-build-image-python3.9"
+                    ),
                     command=[
-                        "bash", "-c",
-                        "pip install --no-cache -r requirements.txt -t /asset-output && cp -au . /asset-output"
+                        "bash",
+                        "-c",
+                        "pip install --no-cache -r requirements.txt -t /asset-output && cp -au . /asset-output",
                     ],
                 ),
             ),
         )
 
         self.api_authorizer = apigateway.TokenAuthorizer(
-            self, 'MyAuthorizer',
+            self,
+            "MyAuthorizer",
             handler=custom_authorizer_lambda,
-            identity_source=apigateway.IdentitySource.header('Authorization')
+            identity_source=apigateway.IdentitySource.header("Authorization"),
         )
 
         # self.api_auth = apigateway.CognitoUserPoolsAuthorizer(

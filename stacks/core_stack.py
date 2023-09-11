@@ -2,6 +2,7 @@ from aws_cdk import aws_s3 as s3
 from aws_cdk import aws_iam as iam
 from aws_cdk import aws_dynamodb as dynamodb
 from aws_cdk import CfnOutput, Stack
+from aws_cdk import aws_sns as sns
 
 
 class CoreStack(Stack):
@@ -29,9 +30,7 @@ class CoreStack(Stack):
             partition_key=dynamodb.Attribute(
                 name="PK", type=dynamodb.AttributeType.STRING
             ),
-            sort_key=dynamodb.Attribute(
-                name="SK", type=dynamodb.AttributeType.STRING
-            ),
+            sort_key=dynamodb.Attribute(name="SK", type=dynamodb.AttributeType.STRING),
             billing_mode=dynamodb.BillingMode.PAY_PER_REQUEST,
         )
         table.add_global_secondary_index(
@@ -73,9 +72,7 @@ class CoreStack(Stack):
             partition_key=dynamodb.Attribute(
                 name="pk", type=dynamodb.AttributeType.STRING
             ),
-            sort_key=dynamodb.Attribute(
-                name="sk", type=dynamodb.AttributeType.STRING
-            ),
+            sort_key=dynamodb.Attribute(name="sk", type=dynamodb.AttributeType.STRING),
             time_to_live_attribute="expires",
         )
         # Add a global secondary index to the table
@@ -94,9 +91,7 @@ class CoreStack(Stack):
         CfnOutput(self, "NextAuthTableName", value=next_auth_table.table_name)
 
         # Create an IAM user
-        next_auth_user = iam.User(
-            self, "NextAuthUser2", user_name="next-auth-user-2"
-        )
+        next_auth_user = iam.User(self, "NextAuthUser2", user_name="next-auth-user-2")
 
         # Attach DynamoDB read/write permissions to the user
         dynamodb_policy = iam.PolicyStatement(
@@ -108,6 +103,11 @@ class CoreStack(Stack):
         access_key = iam.CfnAccessKey(
             self, "NextAuthUserAccessKey", user_name=next_auth_user.user_name
         )
+
+        activity_topic = sns.Topic(
+            self, "Activity Topic", display_name="Activity Topic"
+        )
+        self.activity_topic = activity_topic
 
         # Output the access key details
         CfnOutput(self, "NextAuthUserAccessKeyId", value=access_key.ref)
