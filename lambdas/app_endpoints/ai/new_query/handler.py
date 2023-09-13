@@ -30,9 +30,7 @@ def ai_resolve(kwip_req_body):
         return None
 
 
-def log_query(
-    company_id, user, user_id, ai_query_id, model, query, ai_response
-):
+def log_query(company_id, user, user_id, ai_query_id, model, query, ai_response):
     ai_query_data = {
         "model": model,
         "query": query,
@@ -99,9 +97,7 @@ def handle_post(company_id, user_id, user_name, event):
     print(ai_response)
 
     # Remove reference to sources
-    sanitised_ai_response = sanitise_kwip_response(
-        model=model, ai_response=ai_response
-    )
+    sanitised_ai_response = sanitise_kwip_response(model=model, ai_response=ai_response)
     print(sanitised_ai_response)
 
     # Log Query in DynamoDB
@@ -114,8 +110,10 @@ def handle_post(company_id, user_id, user_name, event):
         query=query,
         ai_response=sanitised_ai_response,
     )
+    res = sanitised_ai_response
+    res["ai_query_id"] = aiquery_id
 
     if sanitised_ai_response:
-        return response(200, sanitised_ai_response)
+        return response(200, res)
     else:
         return response(500, "Error - Please try again later")
