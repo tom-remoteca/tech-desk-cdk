@@ -157,52 +157,58 @@ def manage_query():
         if c["name"] == answers["comapny_name"]:
             company = c
 
-    all_queries = get_all_company_queries(company["id"])
-    if len(all_queries) == 0:
-        print("No Queries")
-        return
-    questions = [
-        {
-            "type": "list",
-            "name": "query",
-            "message": "Select Company:",
-            "choices": [f"{i['query_id']} - {i['query_title']}" for i in all_queries],
-        },
-    ]
-    answers = prompt(questions)
-    for q in all_queries:
-        if q["query_id"] == answers["query"].split(" - ")[0]:
-            query = q
-
     while True:
-        print(f"Query status: {query['query_status']}")
-
+        all_queries = get_all_company_queries(company["id"])
+        if len(all_queries) == 0:
+            print("No Queries")
+            return
+        choices = [f"{i['query_id']} - {i['query_title']}" for i in all_queries]
+        choices.append("Exit")
         questions = [
             {
                 "type": "list",
-                "name": "action",
-                "message": f"Choose an action for '{query['query_title']}'",
-                "choices": [
-                    "Change Status",
-                    "Exit",
-                ],
+                "name": "query",
+                "message": "Select Company:",
+                "choices": choices,
             },
         ]
         answers = prompt(questions)
-
-        if answers["action"] == "Change Status":
-            change_status(company["id"], query)
-
-        elif answers["action"] == "Exit":
-            print("Exiting...")
+        if answers["query"] == "Exit":
             break
 
-        time.sleep(2)
-        query = get_query(
-            company_id=company["id"],
-            user_id=query["submittor_id"],
-            query_id=query["query_id"],
-        )
+        for q in all_queries:
+            if q["query_id"] == answers["query"].split(" - ")[0]:
+                query = q
+
+        while True:
+            print(f"Query status: {query['query_status']}")
+
+            questions = [
+                {
+                    "type": "list",
+                    "name": "action",
+                    "message": f"Choose an action for '{query['query_title']}'",
+                    "choices": [
+                        "Change Status",
+                        "Exit",
+                    ],
+                },
+            ]
+            answers = prompt(questions)
+
+            if answers["action"] == "Change Status":
+                change_status(company["id"], query)
+
+            elif answers["action"] == "Exit":
+                print("Exiting...")
+                break
+
+            time.sleep(2)
+            query = get_query(
+                company_id=company["id"],
+                user_id=query["submittor_id"],
+                query_id=query["query_id"],
+            )
 
 
 # Main function

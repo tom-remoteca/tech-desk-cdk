@@ -60,6 +60,9 @@ def parse_activity(status, raw_activity):
         activity_data["commentor_image"] = raw_activity["commentor_image"]
         activity_data["comment_cotent"] = raw_activity["comment_cotent"]
 
+    elif status == "techDeskComment":
+        activity_data["comment_content"] = raw_activity["comment_content"]
+
     return activity_data
 
 
@@ -134,13 +137,25 @@ def handle_sns(message):
     status = message.get("event")
 
     if status in [
+        "comment",
+        "techDeskComment",
+    ]:
+        activity_data = parse_activity(status=status, raw_activity=message)
+        print(activity_data)
+        create_activity_dynamo(
+            company_id=company_id,
+            query_id=query_id,
+            activity_id=activity_id,
+            activity_data=activity_data,
+        )
+        print("created activity in dynamo")
+    elif status in [
         "created",
         "commenceWriting",
         "assigned",
         "scopeAcceptance",
         "paymentComplete",
         "completed",
-        "comment",
     ]:
         print("handle MESSAGE")
         update_status(
@@ -163,7 +178,7 @@ def handle_sns(message):
             action_data={},
         )
         print("action reset")
-
+    # Update action:
     elif status in [
         "scheduleConsultation",
         "consultationArranged",

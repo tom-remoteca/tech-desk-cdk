@@ -45,8 +45,8 @@ def handler(event, context):
     api_id = os.environ.get("API_ID")
     stage = os.environ.get("STAGE")
     method_arn = f"arn:aws:execute-api:{region}:{account_id}:{api_id}/{stage}/*/*"
-    print(method_arn)
-    print(event)
+    # print(method_arn)
+    # print(event)
     token = event["authorizationToken"]
     # method_arn = event["methodArn"]
     jwt = token.split(" ")[1]
@@ -55,14 +55,14 @@ def handler(event, context):
         parsed_token = get_token(jwt)
     except Exception as e:
         # Invalid JWT, deny access.
-        print("INVALID TOKEN")
+        # print("INVALID TOKEN")
         return generate_policy(token, "Deny", method_arn)
 
     if parsed_token["exp"] < int(time.time()):
         # Token has expired, deny access
-        print("EXPIRED TOKEN")
+        # print("EXPIRED TOKEN")
         return generate_policy(token, "Deny", method_arn)
-    print("ALLOWED!")
+    # print("ALLOWED!")
     return generate_policy(token, "Allow", method_arn, parsed_token)
 
 
