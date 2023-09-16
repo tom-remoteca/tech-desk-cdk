@@ -14,6 +14,7 @@ from boto3.dynamodb.conditions import Key
 # Create the DynamoDB client
 dynamodb = boto3.resource("dynamodb")
 table = dynamodb.Table(os.environ["CORE_TABLE_NAME"])
+sns = boto3.client("sns")
 
 BUCKET_NAME = os.environ["BUCKET_NAME"]
 
@@ -37,8 +38,21 @@ def create_query_freshdesk(parsed_query):
         "priority": 1,
         "status": 2,
     }
-    response = requests.post(
-        url, headers=headers, auth=auth, data=json.dumps(data)
+    response = requests.post(url, headers=headers, auth=auth, data=json.dumps(data))
+    return
+
+
+def add_created_activity(company_id, query_id, user_id):
+    message = {
+        "company_id": company_id,
+        "author_id": user_id,
+        "query_id": query_id,
+        "event": "created",
+    }
+    sns.publish(
+        TopicArn=os.environ["ACTIVITY_TOPIC"],
+        Message=json.dumps(message),
+        # MessageStructure="json",
     )
     return
 
@@ -104,9 +118,7 @@ def parse_raw_query(query_id, event):
     out["query_id"] = query_id
     for k, v in form_data.items():
         if k.startswith("file-"):
-            attachment_id, file_key = write_file_to_s3(
-                query_id=query_id, file_data=v
-            )
+            attachment_id, file_key = write_file_to_s3(query_id=query_id, file_data=v)
             attachments.append(
                 {
                     "file_name": v["file_name"],
@@ -128,16 +140,23 @@ def parse_raw_query(query_id, event):
 def create_query_dynamo(company_id, user_id, query_id, query_data):
     print(query_data)
     if query_data["is_public"] == "true":
-        is_public = "TRUE"
+        primary_keys = {
+            "PK": f"COMPANY#{company_id}#PUBLIC",
+            "SK": f"QUERY#{query_id}",
+            "GSI1PK": f"COMPANY#{company_id}",
+            "GSI1SK": f"QUERY#{query_id}",
+        }
     else:
-        is_public = "FALSE"
-
-    table.put_item(
-        Item={
+        primary_keys = {
             "PK": f"COMPANY#{company_id}#USER#{user_id}",
             "SK": f"QUERY#{query_id}",
             "GSI1PK": f"COMPANY#{company_id}",
-            "GSI1SK": f"PUBLIC#{is_public}QUERY#{query_id}",
+            "GSI1SK": f"QUERY#{query_id}",
+        }
+
+    table.put_item(
+        Item={
+            **primary_keys,
             "query_data": query_data,
         }
     )
@@ -178,18 +197,12 @@ def handle_post(company_id, user_id, event):
     # Process data in webkit form and save attachments to s3
     parsed_query = parse_raw_query(query_id, event)
     parsed_query["submittor_id"] = user_id
-    parsed_query["submittor_email"] = event["requestContext"]["authorizer"][
-        "email"
-    ]
-    parsed_query["company_name"] = event["requestContext"]["authorizer"][
-        "company_name"
-    ]
-    parsed_query["company_id"] = event["requestContext"]["authorizer"][
-        "company_id"
-    ]
+    parsed_query["submittor_email"] = event["requestContext"]["authorizer"]["email"]
+    parsed_query["company_name"] = event["requestContext"]["authorizer"]["company_name"]
+    parsed_query["company_id"] = event["requestContext"]["authorizer"]["company_id"]
     parsed_query["id"] = query_id
     parsed_query["date_submitted"] = str(int(time.time()))
-    parsed_query["query_status"] = "Submitted"
+    parsed_query["query_status"] = "created"
     parsed_query["company_id"] = company_id
 
     # Send Query to FreshDesk
@@ -198,6 +211,8 @@ def handle_post(company_id, user_id, event):
     # Save this request to Dynamo
     create_query_dynamo(company_id, user_id, query_id, parsed_query)
 
+    # add the created activity to this
+    add_created_activity(company_id=company_id, query_id=query_id, user_id=user_id)
     return response(200, parsed_query)
 
 
@@ -205,7 +220,7 @@ def handle_get(company_id, user_id):
     # Define the primary key for user's own queries
     primary_key_user = {
         "PK": f"COMPANY#{company_id}#USER#{user_id}",
-        "SK": "QUERY",
+        "SK": "QUERY#",
     }
 
     projection_expression = "SK, query_data.id, query_data.is_public, \
@@ -221,15 +236,14 @@ def handle_get(company_id, user_id):
 
     # Define the primary key for public queries
     primary_key_public = {
-        "GSI1PK": f"COMPANY#{company_id}",
-        "GSI1SK": "PUBLIC#TRUE",
+        "PK": f"COMPANY#{company_id}#PUBLIC",
+        "SK": "QUERY#",
     }
 
     # Execute the query for public queries
     response_public = table.query(
-        IndexName="GSI1",  # replace with your GSI name
-        KeyConditionExpression=Key("GSI1PK").eq(primary_key_public["GSI1PK"])
-        & Key("GSI1SK").begins_with(primary_key_public["GSI1SK"]),
+        KeyConditionExpression=Key("PK").eq(primary_key_public["PK"])
+        & Key("SK").begins_with(primary_key_public["SK"]),
         ProjectionExpression=projection_expression,
     )
 
@@ -238,9 +252,7 @@ def handle_get(company_id, user_id):
     items_public = response_public["Items"]
 
     query_ids = set([item["SK"] for item in items_user])
-    items_public = [
-        item for item in items_public if item["SK"] not in query_ids
-    ]
+    items_public = [item for item in items_public if item["SK"] not in query_ids]
 
     items = items_user + items_public
 

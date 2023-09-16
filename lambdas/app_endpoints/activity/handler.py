@@ -58,7 +58,7 @@ def parse_activity(status, raw_activity):
     elif status == "comment":
         activity_data["commentor"] = raw_activity["commentor"]
         activity_data["commentor_image"] = raw_activity["commentor_image"]
-        activity_data["comment_cotent"] = raw_activity["comment_cotent"]
+        activity_data["comment_content"] = raw_activity["comment_content"]
 
     elif status == "techDeskComment":
         activity_data["comment_content"] = raw_activity["comment_content"]
@@ -97,18 +97,34 @@ def parse_action(status, message):
 
 
 def update_action_dynamo(company_id, author_id, query_id, action_data):
-    keys = {"PK": f"COMPANY#{company_id}#USER#{author_id}", "SK": f"QUERY#{query_id}"}
+    # First, search using GSI to find the correct PK and SK
+    response = table.query(
+        IndexName="GSI1",
+        KeyConditionExpression="GSI1PK = :gsi1pk AND GSI1SK = :gsi1sk",
+        ExpressionAttributeValues={
+            ":gsi1pk": f"COMPANY#{company_id}",
+            ":gsi1sk": f"QUERY#{query_id}",
+        },
+    )
 
+    if "Items" not in response or len(response["Items"]) == 0:
+        print("No matching item found.")
+        return
+
+    item = response["Items"][0]
+    pk = item["PK"]
+    sk = item["SK"]
+
+    # Now that we have the correct PK and SK, perform the update
     update_expression = "SET query_data.action_data = :new_action_data"
     expression_attribute_values = {":new_action_data": action_data}
 
-    # Update item in DynamoDB
-    response = table.update_item(
-        Key=keys,
+    update_response = table.update_item(
+        Key={"PK": pk, "SK": sk},
         UpdateExpression=update_expression,
         ExpressionAttributeValues=expression_attribute_values,
     )
-    print(response)
+    print(update_response)
 
 
 def update_status(company_id, author_id, query_id, status):
@@ -226,49 +242,42 @@ def handler(event, context):
 
     # Handle API GW requests
     else:
-        print("APIGW Req")
         company_id = event["requestContext"]["authorizer"]["company_id"]
         query_id = event["pathParameters"]["query_id"]
 
         if event["httpMethod"] == "GET":
-            print("handling_get")
             return handle_get(company_id, query_id)
 
-        # elif event["httpMethod"] == "POST":
-        # return handle_post(company_id, query_id, event)
+        elif event["httpMethod"] == "POST":
+            return handle_post(company_id, query_id, event)
 
         else:
             return response(403, "Action not permitted")
 
 
 def handle_post(company_id, query_id, event):
+    body = json.loads(event["body"])
+    event_status = body["event"]
     activity_id = f"activity_{uuid.uuid4()}"
-    print(activity_id)
-    activity_data = {}
 
-    activity_data["query_id"] = query_id
-    activity_data["company_id"] = company_id
-    activity_data["submittor_id"] = event["requestContext"]["authorizer"]["user_id"]
-    activity_data["submittor_image"] = event["requestContext"]["authorizer"]["image"]
-    activity_data["submittor_email"] = event["requestContext"]["authorizer"]["email"]
-    activity_data["company_name"] = event["requestContext"]["authorizer"][
-        "company_name"
-    ]
-    activity_data["id"] = activity_id
-    activity_data["date"] = str(int(time.time()))
+    if event_status == "comment":
+        activity_data = {
+            "commentor": event["requestContext"]["authorizer"]["name"],
+            "datetime": int((datetime.now()).timestamp()),
+            "comment_content": body["comment_body"],
+            "commentor_image": event["requestContext"]["authorizer"]["picture"],
+            "event": "comment",
+        }
 
-    # Add activity info to freshdesk ticket
-    # TODO
-
-    # Save this request to Dynamo
-    create_activity_dynamo(
-        company_id=company_id,
-        query_id=query_id,
-        activity_id=activity_id,
-        activity_data=activity_data,
-    )
-
-    return response(200, activity_data)
+    if activity_data:
+        create_activity_dynamo(
+            company_id=company_id,
+            query_id=query_id,
+            activity_id=activity_id,
+            activity_data=activity_data,
+        )
+        return response(200, activity_data)
+    return response(400, "")
 
 
 def handle_get(company_id, query_id):
@@ -277,17 +286,11 @@ def handle_get(company_id, query_id):
         "SK": "ACTIVITY#",
     }
 
-    # projection_expression = "SK, query_data.id, query_data.is_public, \
-    #                         query_data.query_title, query_data.query_status, \
-    #                         query_data.date_submitted"
-
-    # Execute the query for user's own queries
     res = table.query(
         KeyConditionExpression=Key("PK").eq(primary_key["PK"])
         & Key("SK").begins_with(primary_key["SK"]),
-        # ProjectionExpression=projection_expression,
     )
-    print(res)
+
     all_activity = [item["activity"] for item in res.get("Items", [])]
     print(all_activity)
     return response(200, all_activity)

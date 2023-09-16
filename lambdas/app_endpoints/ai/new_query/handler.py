@@ -110,9 +110,7 @@ def handle_post(company_id, user_id, user_name, event):
         query=query,
         ai_response=sanitised_ai_response,
     )
-    res = sanitised_ai_response
-    res["ai_query_id"] = aiquery_id
-
+    res = {"ai_response": sanitised_ai_response, "ai_query_id": aiquery_id}
     if sanitised_ai_response:
         return response(200, res)
     else:
