@@ -11,11 +11,12 @@ from company_functions import (
 )
 
 from activity_functions import (
-    update_query_activity,
-    change_query_status,
     get_all_company_queries,
     change_status,
     get_query,
+    comment_as_expert,
+    comment_as_techdesk,
+    complete_add_report,
 )
 
 
@@ -120,28 +121,6 @@ def manage_company():
             break
 
 
-# Functions for query update workflow
-def manage_add_activity(query_id):
-    questions = [
-        {"type": "input", "name": "activity", "message": "Enter new activity:"}
-    ]
-    answers = prompt(questions)
-    update_query_activity(query_id, answers["activity"])
-
-
-def manage_change_status(query_id):
-    questions = [
-        {
-            "type": "list",
-            "name": "status",
-            "message": "Choose new status:",
-            "choices": ["Open", "Closed", "In Progress"],
-        }
-    ]
-    answers = prompt(questions)
-    change_query_status(query_id, answers["status"])
-
-
 def manage_query():
     companies = get_all_companies()
     questions = [
@@ -151,6 +130,11 @@ def manage_query():
             "message": "Select Company:",
             "choices": [i["name"] for i in companies],
         },
+        # {
+        #     "type": "input",
+        #     "name": "query_id",
+        #     "message": "Enter Query ID:",
+        # },
     ]
     answers = prompt(questions)
     for c in companies:
@@ -168,10 +152,11 @@ def manage_query():
             {
                 "type": "list",
                 "name": "query",
-                "message": "Select Company:",
+                "message": "Select Query:",
                 "choices": choices,
             },
         ]
+
         answers = prompt(questions)
         if answers["query"] == "Exit":
             break
@@ -179,8 +164,8 @@ def manage_query():
         for q in all_queries:
             if q["query_id"] == answers["query"].split(" - ")[0]:
                 query = q
-
         while True:
+            print(query)
             print(f"Query status: {query['query_status']}")
 
             questions = [
@@ -190,6 +175,9 @@ def manage_query():
                     "message": f"Choose an action for '{query['query_title']}'",
                     "choices": [
                         "Change Status",
+                        "Comment As Expert",
+                        "Comment As TechDesk",
+                        "Complete & Add Report",
                         "Exit",
                     ],
                 },
@@ -198,6 +186,15 @@ def manage_query():
 
             if answers["action"] == "Change Status":
                 change_status(company["id"], query)
+
+            if answers["action"] == "Comment As Expert":
+                comment_as_expert(company["id"], query)
+
+            if answers["action"] == "Comment As TechDesk":
+                comment_as_techdesk(company["id"], query)
+
+            if answers["action"] == "Complete & Add Report":
+                complete_add_report(company["id"], query)
 
             elif answers["action"] == "Exit":
                 print("Exiting...")

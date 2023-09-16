@@ -30,12 +30,126 @@ def create_notification(company_id, query, badge):
     return notification
 
 
-def update_query_activity(query_id, activity):
-    print(f"Activity '{activity}' has been added to Query ID: {query_id}.")
+def comment_as_expert(company_id, query):
+    questions = [
+        {
+            "type": "list",
+            "name": "expert",
+            "message": "Select an expert",
+            "choices": agents.keys(),
+        },
+        {
+            "type": "input",
+            "name": "comment_content",
+            "message": "Please input comment text",
+        },
+    ]
+    answers = prompt(questions)
+    body = {
+        "commentor": agents[answers["expert"]]["name"],
+        "commentor_image": agents[answers["expert"]]["image"],
+        "comment_content": answers["comment_content"],
+    }
+    sns_event = {
+        "company_id": company_id,
+        "author_id": query["submittor_id"],
+        "query_id": query["query_id"],
+        "event": "comment",
+        **body,
+    }
+    print(sns_event)
+    publish_to_sns(json.dumps(sns_event))
+    create_notification(company_id=company_id, query=query, badge="New Comment!")
+    return
 
 
-def change_query_status(query_id, status):
-    print(f"Status of Query ID {query_id} changed to '{status}'.")
+def comment_as_techdesk(company_id, query):
+    questions = [
+        {
+            "type": "input",
+            "name": "comment_content",
+            "message": "Please input techdesk comment text",
+        },
+    ]
+    answers = prompt(questions)
+    body = {
+        "comment_content": answers["comment_content"],
+    }
+    sns_event = {
+        "company_id": company_id,
+        "author_id": query["submittor_id"],
+        "query_id": query["query_id"],
+        "event": "techDeskComment",
+        **body,
+    }
+    print(sns_event)
+    publish_to_sns(json.dumps(sns_event))
+    create_notification(company_id=company_id, query=query, badge="New Comment!")
+    return
+
+
+def complete_add_report(company_id, query):
+    questions = [
+        {
+            "type": "input",
+            "name": "report_title",
+            "message": "Report Title:",
+        },
+        {
+            "type": "input",
+            "name": "report_author",
+            "message": "Report Author:",
+        },
+        {
+            "type": "input",
+            "name": "report_location_key",
+            "message": "s3 key:",
+        },
+    ]
+    report_id = f"report_{uuid.uuid4()}"
+    answers = prompt(questions)
+    is_public = query["is_public"]
+
+    if is_public == "true":
+        primary_keys = {
+            "PK": f"COMPANY#{company_id}#USER#{query['submittor_id']}",
+            "SK": f"REPORT#{report_id}",
+            "GSI1PK": f"COMPANY#{company_id}",
+            "GSI1SK": f"REPORT#{report_id}",
+        }
+    else:
+        primary_keys = {
+            "PK": f"COMPANY#{company_id}#USER#{query['submittor_id']}",
+            "SK": f"REPORT#{report_id}",
+        }
+
+    report_data = {
+        "id": report_id,
+        "title": answers["report_title"],
+        "author": answers["report_author"],
+        "location_key": answers["report_location_key"],
+        "query_id": query["id"],
+        "date": int(time.time() * 1000),
+    }
+
+    core_table.put_item(
+        Item={
+            **primary_keys,
+            "report_data": report_data,
+        }
+    )
+
+    # Update status to complete
+    sns_event = {
+        "company_id": company_id,
+        "author_id": query["submittor_id"],
+        "query_id": query["query_id"],
+        "event": "completed",
+        "location_key": answers["report_location_key"],
+    }
+    print(sns_event)
+    publish_to_sns(json.dumps(sns_event))
+    return
 
 
 def get_all_company_queries(company_id):
@@ -43,21 +157,27 @@ def get_all_company_queries(company_id):
     res = core_table.query(
         IndexName="GSI1",
         KeyConditionExpression=Key("GSI1PK").eq(f"COMPANY#{company_id}")
-        & Key("GSI1SK").begins_with("PUBLIC#"),
+        & Key("GSI1SK").begins_with("QUERY#"),
     )
     return [i["query_data"] for i in res.get("Items", [])]
 
 
 def get_query(company_id, user_id, query_id):
-    primary_key_private = {
-        "PK": f"COMPANY#{company_id}#USER#{user_id}",
-        "SK": f"QUERY#{query_id}",
-    }
-    res = core_table.query(
-        KeyConditionExpression=Key("PK").eq(primary_key_private["PK"])
-        & Key("SK").eq(primary_key_private["SK"]),
+    # First, search using GSI to find the correct PK and SK
+    response = core_table.query(
+        IndexName="GSI1",
+        KeyConditionExpression="GSI1PK = :gsi1pk AND GSI1SK = :gsi1sk",
+        ExpressionAttributeValues={
+            ":gsi1pk": f"COMPANY#{company_id}",
+            ":gsi1sk": f"QUERY#{query_id}",
+        },
     )
-    return res["Items"][0]["query_data"]
+
+    if "Items" not in response or len(response["Items"]) == 0:
+        print("No matching item found.")
+        return
+
+    return response["Items"][0]["query_data"]
 
 
 def change_status(company_id, query):
@@ -72,9 +192,9 @@ def change_status(company_id, query):
         "inputPayment": ["pay_instant_url", "pay_invoice_url"],
         "paymentComplete": ["payment_details", "invoice"],
         "commenceWriting": [],
-        "completed": ["report_loc"],
-        "expertComment": ["comment_content"],
-        "techDeskComment": ["comment_content"],
+        # "completed": ["report_loc"],
+        # "expertComment": ["comment_content"],
+        # "techDeskComment": ["comment_content"],
         "Exit": [],
     }
     while True:
@@ -125,7 +245,7 @@ def change_status(company_id, query):
                 answers = {
                     "commentor": agent["name"],
                     "commentor_image": agent["image"],
-                    "comment_cotent": comment_answers["comment_content"],
+                    "comment_content": comment_answers["comment_content"],
                 }
                 new_status = "comment"
 
@@ -173,19 +293,17 @@ def change_status(company_id, query):
 
 
 def parse_action(status, message):
-    if status == "scheduleConsultation":
-        return {"scheduler_url": message["scheduler_url"]}
-    elif status == "consultationArranged":
-        return {
+    """Parse and return action details based on status."""
+    actions = {
+        "scheduleConsultation": {"scheduler_url": message["scheduler_url"]},
+        "consultationArranged": {
             "meeting_time": message["meeting_time"],
             "meeting_url": message["meeting_url"],
-        }
-    elif status == "inputScopeEngagement":
-        return {
-            "scope_url": message["scope_url"],
-        }
-    elif status == "inputPayment":
-        return {
+        },
+        "inputScopeEngagement": {"scope_url": message["scope_url"]},
+        "inputPayment": {
             "pay_instant_url": message["pay_instant_url"],
             "pay_invoice_url": message["pay_invoice_url"],
-        }
+        },
+    }
+    return actions.get(status, {})
