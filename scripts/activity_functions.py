@@ -112,7 +112,7 @@ def complete_add_report(company_id, query):
 
     if is_public == "true":
         primary_keys = {
-            "PK": f"COMPANY#{company_id}#USER#{query['submittor_id']}",
+            "PK": f"COMPANY#{company_id}#PUBLIC",
             "SK": f"REPORT#{report_id}",
             "GSI1PK": f"COMPANY#{company_id}",
             "GSI1SK": f"REPORT#{report_id}",
@@ -121,13 +121,15 @@ def complete_add_report(company_id, query):
         primary_keys = {
             "PK": f"COMPANY#{company_id}#USER#{query['submittor_id']}",
             "SK": f"REPORT#{report_id}",
+            "GSI1PK": f"COMPANY#{company_id}",
+            "GSI1SK": f"REPORT#{report_id}",
         }
 
     report_data = {
         "id": report_id,
-        "title": answers["report_title"],
-        "author": answers["report_author"],
-        "location_key": answers["report_location_key"],
+        "report_title": answers["report_title"],
+        "report_author": answers["report_author"],
+        "report_loc": answers["report_location_key"],
         "query_id": query["id"],
         "date": int(time.time() * 1000),
     }
@@ -141,11 +143,13 @@ def complete_add_report(company_id, query):
 
     # Update status to complete
     sns_event = {
-        "company_id": company_id,
-        "author_id": query["submittor_id"],
-        "query_id": query["query_id"],
         "event": "completed",
-        "location_key": answers["report_location_key"],
+        "company_id": company_id,
+        "query_id": query["query_id"],
+        "author_id": query["submittor_id"],
+        "report_title": answers["report_title"],
+        "report_author": answers["report_author"],
+        "report_loc": answers["report_location_key"],
     }
     print(sns_event)
     publish_to_sns(json.dumps(sns_event))
