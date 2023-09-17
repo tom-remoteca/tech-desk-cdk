@@ -174,15 +174,51 @@ class EndpointsStack(Stack):
             subscriptions.LambdaSubscription(activity_lambda)
         )
 
+        reports_lambda = _lambda.Function(
+            self,
+            "ReportsLambda",
+            handler="handler.handler",
+            runtime=_lambda.Runtime.PYTHON_3_9,
+            code=_lambda.Code.from_asset(
+                f"{os.path.dirname(__file__)}/../lambdas/app_endpoints/reports/reports"
+            ),
+            environment={
+                "CORE_TABLE_NAME": core_table.table_name,
+            },
+        )
+
+        core_table.grant_read_write_data(reports_lambda)
+
+        report_lambda = _lambda.Function(
+            self,
+            "ReportLambda",
+            handler="handler.handler",
+            runtime=_lambda.Runtime.PYTHON_3_9,
+            code=_lambda.Code.from_asset(
+                f"{os.path.dirname(__file__)}/../lambdas/app_endpoints/reports/report"
+            ),
+            environment={
+                "CORE_TABLE_NAME": core_table.table_name,
+            },
+        )
+
+        core_table.grant_read_write_data(report_lambda)
+
         ai_api = api.root.add_resource("ai")
         ai_query = ai_api.add_resource("new_query")
         ai_history = ai_api.add_resource("history")
         ai_query_history = ai_history.add_resource("{ai_query_id}")
+
         queries_api = api.root.add_resource("queries")
         query_api = queries_api.add_resource("{query_id}")
         activity_api = query_api.add_resource("activity")
+
+        reports_api = api.root.add_resource("reports")
+        report_api = reports_api.add_resource("{report_id}")
+
         users_api = api.root.add_resource("users")
         user_api = users_api.add_resource("{user_id}")
+
         notifications_api = api.root.add_resource("notifications")
         notification_api = notifications_api.add_resource("{notification_id}")
 
@@ -261,5 +297,17 @@ class EndpointsStack(Stack):
         activity_api.add_method(
             "POST",
             apigateway.LambdaIntegration(activity_lambda),
+            authorizer=api_authorizer,
+        )
+
+        reports_api.add_method(
+            "GET",
+            apigateway.LambdaIntegration(reports_lambda),
+            authorizer=api_authorizer,
+        )
+
+        report_api.add_method(
+            "GET",
+            apigateway.LambdaIntegration(report_lambda),
             authorizer=api_authorizer,
         )

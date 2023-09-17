@@ -1,38 +1,31 @@
 import os
-import cgi
 import json
 import uuid
 import boto3
-import time
-import base64
 import requests
 from datetime import datetime
-from io import BytesIO
 
 from boto3.dynamodb.conditions import Key
-
 
 # Create the DynamoDB client
 dynamodb = boto3.resource("dynamodb")
 table = dynamodb.Table(os.environ["CORE_TABLE_NAME"])
 
-# BUCKET_NAME = os.environ["BUCKET_NAME"]
 
+def update_fd_query(query, message_obj):
+    url = f"https://remotecalimited.freshdesk.com/api/v2/tickets/{query['query_data']['ticket_id']}/reply"
 
-# def create_query_freshdesk(parsed_query):
-#     url = "https://remotecalimited.freshdesk.com/api/v2/tickets"
-#     headers = {"Content-Type": "application/json"}
-#     auth = ("CwDi38QwCfnAoWAFsy", "X")
-#     ticket_desc = dict_to_html(parsed_query)
-#     data = {
-#         "description": ticket_desc,
-#         "subject": f"{parsed_query['company_name']}: {parsed_query['query_title']}",
-#         "email": "tom@remoteca.co.uk",
-#         "priority": 1,
-#         "status": 2,
-#     }
-#     response = requests.post(url, headers=headers, auth=auth, data=json.dumps(data))
-#     return
+    headers = {"Content-Type": "application/json"}
+    auth = ("CwDi38QwCfnAoWAFsy", "X")
+
+    html_content = ""
+    for key, value in message_obj.items():
+        html_content += f"<strong>{key}</strong>: {value}<br/>"
+
+    data = {"body": html_content}
+    response = requests.post(url, headers=headers, auth=auth, data=json.dumps(data))
+    print(response)
+    return
 
 
 def parse_activity(status, raw_activity):
@@ -53,6 +46,8 @@ def parse_activity(status, raw_activity):
         activity_data["invoice"] = raw_activity["invoice"]
 
     elif status == "completed":
+        activity_data["report_title"] = raw_activity["report_title"]
+        activity_data["report_author"] = raw_activity["report_author"]
         activity_data["report_loc"] = raw_activity["report_loc"]
 
     elif status == "comment":
@@ -66,14 +61,17 @@ def parse_activity(status, raw_activity):
     return activity_data
 
 
-def create_activity_dynamo(company_id, query_id, activity_id, activity_data):
+def create_activity_dynamo(query, activity_data):
+    activity_id = f"activity_{uuid.uuid4()}"
+
     res = table.put_item(
         Item={
-            "PK": f"COMPANY#{company_id}#QUERY#{query_id}",
+            "PK": f"COMPANY#{query['query_data']['company_id']}#QUERY#{query['query_data']['id']}",
             "SK": f"ACTIVITY#{activity_id}",
             "activity": activity_data,
         }
     )
+
     return activity_data
 
 
@@ -94,43 +92,33 @@ def parse_action(status, message):
             "pay_instant_url": message["pay_instant_url"],
             "pay_invoice_url": message["pay_invoice_url"],
         }
+    elif status == "completed":
+        return {
+            "report_title": message["report_title"],
+            "report_author": message["report_author"],
+            "report_loc": message["report_loc"],
+        }
 
 
-def update_action_dynamo(company_id, author_id, query_id, action_data):
-    # First, search using GSI to find the correct PK and SK
-    response = table.query(
-        IndexName="GSI1",
-        KeyConditionExpression="GSI1PK = :gsi1pk AND GSI1SK = :gsi1sk",
-        ExpressionAttributeValues={
-            ":gsi1pk": f"COMPANY#{company_id}",
-            ":gsi1sk": f"QUERY#{query_id}",
-        },
-    )
-
-    if "Items" not in response or len(response["Items"]) == 0:
-        print("No matching item found.")
-        return
-
-    item = response["Items"][0]
-    pk = item["PK"]
-    sk = item["SK"]
-
+def update_action_dynamo(query, action_data):
     # Now that we have the correct PK and SK, perform the update
     update_expression = "SET query_data.action_data = :new_action_data"
     expression_attribute_values = {":new_action_data": action_data}
 
     update_response = table.update_item(
-        Key={"PK": pk, "SK": sk},
+        Key={"PK": query["PK"], "SK": query["SK"]},
         UpdateExpression=update_expression,
         ExpressionAttributeValues=expression_attribute_values,
     )
+
     print(update_response)
 
 
-def update_status(company_id, author_id, query_id, status):
-    if status == "comment":
+def update_status(query, status):
+    if status in ["techDeskComment", "comment"]:
         return
-    keys = {"PK": f"COMPANY#{company_id}#USER#{author_id}", "SK": f"QUERY#{query_id}"}
+
+    keys = {"PK": query["PK"], "SK": query["SK"]}
 
     update_expression = "SET query_data.query_status = :new_status"
     expression_attribute_values = {":new_status": status}
@@ -147,74 +135,68 @@ def update_status(company_id, author_id, query_id, status):
 def handle_sns(message):
     company_id = message["company_id"]
     query_id = message["query_id"]
-    author_id = message["author_id"]
-    activity_id = f"activity_{uuid.uuid4()}"
 
     status = message.get("event")
 
+    response = table.query(
+        IndexName="GSI1",
+        KeyConditionExpression="GSI1PK = :gsi1pk AND GSI1SK = :gsi1sk",
+        ExpressionAttributeValues={
+            ":gsi1pk": f"COMPANY#{company_id}",
+            ":gsi1sk": f"QUERY#{query_id}",
+        },
+    )
+    query = response["Items"][0]
+
     if status in [
-        "comment",
-        "techDeskComment",
-    ]:
-        activity_data = parse_activity(status=status, raw_activity=message)
-        print(activity_data)
-        create_activity_dynamo(
-            company_id=company_id,
-            query_id=query_id,
-            activity_id=activity_id,
-            activity_data=activity_data,
-        )
-        print("created activity in dynamo")
-    elif status in [
         "created",
         "commenceWriting",
         "assigned",
         "scopeAcceptance",
         "paymentComplete",
         "completed",
+        "comment",
+        "techDeskComment",
     ]:
-        print("handle MESSAGE")
-        update_status(
-            company_id=company_id, author_id=author_id, query_id=query_id, status=status
-        )
-        print("Status Updated")
         activity_data = parse_activity(status=status, raw_activity=message)
         print(activity_data)
+
         create_activity_dynamo(
-            company_id=company_id,
-            query_id=query_id,
-            activity_id=activity_id,
+            query=query,
             activity_data=activity_data,
         )
         print("created activity in dynamo")
-        update_action_dynamo(
-            company_id=company_id,
-            author_id=author_id,
-            query_id=query_id,
-            action_data={},
-        )
-        print("action reset")
+
+        if status not in [
+            "comment",
+            "techDeskComment",
+        ]:
+            update_action_dynamo(
+                query=query,
+                action_data={},
+            )
+            print("action reset")
     # Update action:
-    elif status in [
+    if status in [
         "scheduleConsultation",
         "consultationArranged",
         "inputScopeEngagement",
         "inputPayment",
+        "completed",
     ]:
         print("handle ACTION")
-        update_status(
-            company_id=company_id, author_id=author_id, query_id=query_id, status=status
-        )
-        print("Status Updated")
         action_data = parse_action(status, message)
         print(action_data)
         update_action_dynamo(
-            company_id=company_id,
-            author_id=author_id,
-            query_id=query_id,
+            query=query,
             action_data=action_data,
         )
         print("action updated.")
+
+    update_status(query=query, status=status)
+    print("status updated")
+    update_fd_query(query=query, message_obj={"status": status})
+    print("fd updated")
 
 
 def response(status_code, body):
@@ -258,7 +240,16 @@ def handler(event, context):
 def handle_post(company_id, query_id, event):
     body = json.loads(event["body"])
     event_status = body["event"]
-    activity_id = f"activity_{uuid.uuid4()}"
+
+    res = table.query(
+        IndexName="GSI1",
+        KeyConditionExpression="GSI1PK = :gsi1pk AND GSI1SK = :gsi1sk",
+        ExpressionAttributeValues={
+            ":gsi1pk": f"COMPANY#{company_id}",
+            ":gsi1sk": f"QUERY#{query_id}",
+        },
+    )
+    query = res["Items"][0]
 
     if event_status == "comment":
         activity_data = {
@@ -271,12 +262,15 @@ def handle_post(company_id, query_id, event):
 
     if activity_data:
         create_activity_dynamo(
-            company_id=company_id,
-            query_id=query_id,
-            activity_id=activity_id,
+            query=query,
             activity_data=activity_data,
         )
+        update_fd_query(
+            query=query, message_obj={"status": event_status, **activity_data}
+        )
+        print("fd updated")
         return response(200, activity_data)
+
     return response(400, "")
 
 

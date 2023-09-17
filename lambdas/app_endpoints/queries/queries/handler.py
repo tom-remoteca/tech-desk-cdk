@@ -39,7 +39,20 @@ def create_query_freshdesk(parsed_query):
         "status": 2,
     }
     response = requests.post(url, headers=headers, auth=auth, data=json.dumps(data))
-    return
+    if response.status_code == 201:  # 201 means "Created"
+        response_data = (
+            response.json()
+        )  # This will give you the JSON object returned by Freshdesk
+        ticket_id = response_data.get(
+            "id"
+        )  # Retrieve the ID of the ticket from the respons
+        print(f"Ticket ID: {ticket_id}")
+        return ticket_id
+    else:
+        print(
+            f"Error creating ticket. Status Code: {response.status_code}, Response: {response.text}"
+        )
+        return None
 
 
 def add_created_activity(company_id, query_id, user_id):
@@ -206,7 +219,12 @@ def handle_post(company_id, user_id, event):
     parsed_query["company_id"] = company_id
 
     # Send Query to FreshDesk
-    create_query_freshdesk(parsed_query)
+    ticket_id = create_query_freshdesk(parsed_query)
+
+    if not ticket_id:
+        return response(501, "E3012")
+
+    parsed_query["ticket_id"] = ticket_id
 
     # Save this request to Dynamo
     create_query_dynamo(company_id, user_id, query_id, parsed_query)

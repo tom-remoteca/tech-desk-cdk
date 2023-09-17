@@ -3,12 +3,12 @@ import json
 import boto3
 
 from boto3.dynamodb.conditions import Key
+from botocore.exceptions import ClientError
 
 
 # Create the DynamoDB client
 dynamodb = boto3.resource("dynamodb")
 table = dynamodb.Table(os.environ["CORE_TABLE_NAME"])
-BUCKET_NAME = os.environ["BUCKET_NAME"]
 
 
 def response(status_code, body={}):
@@ -26,35 +26,49 @@ def response(status_code, body={}):
 
 def handler(event, context):
     # Get Query ID from Path & MEO from URLarg
-    query_id = event["pathParameters"]["query_id"]
-    is_public = event["multiValueQueryStringParameters"]["is_public"][0]
-    user_id = event["requestContext"]["authorizer"]["user_id"]
+    report_id = event["pathParameters"]["report_id"]
     company_id = event["requestContext"]["authorizer"]["company_id"]
+    user_id = event["requestContext"]["authorizer"]["user_id"]
     if event["httpMethod"] == "GET":
-        return handle_get(company_id, user_id, query_id=query_id, is_public=is_public)
+        return handle_get(company_id, user_id, report_id=report_id)
     return response(200)
 
 
-def handle_get(company_id, user_id, query_id: str, is_public: bool):
-    if is_public == "true":
-        primary_key_public = {
-            "GSI1PK": f"COMPANY#{company_id}",
-            "GSI1SK": f"PUBLIC#TRUEQUERY#{query_id}",
-        }
-        res = table.query(
-            IndexName="GSI1",
-            KeyConditionExpression=Key("GSI1PK").eq(primary_key_public["GSI1PK"])
-            & Key("GSI1SK").eq(primary_key_public["GSI1SK"]),
-        )
-    elif is_public == "false":
-        primary_key_private = {
-            "PK": f"COMPANY#{company_id}#USER#{user_id}",
-            "SK": f"QUERY#{query_id}",
-        }
-        print(primary_key_private)
+def handle_get(company_id, user_id, report_id: str):
+    # Attempt to retrieve using private keys
+    primary_key_private = {
+        "PK": f"COMPANY#{company_id}#USER#{user_id}",
+        "SK": f"REPORT#{report_id}",
+    }
+
+    try:
         res = table.query(
             KeyConditionExpression=Key("PK").eq(primary_key_private["PK"])
             & Key("SK").eq(primary_key_private["SK"]),
         )
-        print(res["Items"])
-    return response(200, res["Items"][0]["query_data"])
+
+        # If an item is found using private keys, return
+        if res["Items"]:
+            return response(200, res["Items"][0]["query_data"])
+    except ClientError:
+        pass  # If there's an error, it'll proceed to the public key lookup
+
+    # If nothing found with private keys, attempt to retrieve using public keys
+    primary_key_public = {
+        "PK": f"COMPANY#{company_id}#PUBLIC",
+        "SK": f"REPORT#{report_id}",
+    }
+
+    try:
+        res = table.query(
+            KeyConditionExpression=Key("PK").eq(primary_key_public["PK"])
+            & Key("SK").eq(primary_key_public["SK"]),
+        )
+
+        # If an item is found using public keys, return
+        if res["Items"]:
+            return response(200, res["Items"][0]["query_data"])
+    except ClientError:
+        pass  # You can handle the error as appropriate for your application
+
+    return response(403, "User doesn't have access to the report")
