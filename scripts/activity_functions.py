@@ -108,22 +108,18 @@ def complete_add_report(company_id, query):
     ]
     report_id = f"report_{uuid.uuid4()}"
     answers = prompt(questions)
-    is_public = query["is_public"]
 
-    if is_public == "true":
-        primary_keys = {
-            "PK": f"COMPANY#{company_id}#PUBLIC",
-            "SK": f"REPORT#{report_id}",
-            "GSI1PK": f"COMPANY#{company_id}",
-            "GSI1SK": f"REPORT#{report_id}",
-        }
+    if query["is_public"] == "true":
+        suffix = "#PUBLIC"
     else:
-        primary_keys = {
-            "PK": f"COMPANY#{company_id}#USER#{query['submittor_id']}",
-            "SK": f"REPORT#{report_id}",
-            "GSI1PK": f"COMPANY#{company_id}",
-            "GSI1SK": f"REPORT#{report_id}",
-        }
+        suffix = f"#USER#{query['submittor_id']}"
+
+    primary_keys = {
+        "PK": f"COMPANY#{company_id}{suffix}",
+        "SK": f"REPORT#{report_id}",
+        "GSI1PK": f"COMPANY#{company_id}",
+        "GSI1SK": f"REPORT#{report_id}",
+    }
 
     report_data = {
         "id": report_id,
@@ -147,12 +143,10 @@ def complete_add_report(company_id, query):
         "company_id": company_id,
         "query_id": query["query_id"],
         "author_id": query["submittor_id"],
-        "report_title": answers["report_title"],
-        "report_author": answers["report_author"],
-        "report_loc": answers["report_location_key"],
     }
     print(sns_event)
     publish_to_sns(json.dumps(sns_event))
+    update_query_dynamo(query=query, field="report_details", data=report_data)
     return
 
 
@@ -184,21 +178,74 @@ def get_query(company_id, user_id, query_id):
     return response["Items"][0]["query_data"]
 
 
+def parse_update_query_data(status, answers):
+    if status == "assigned":
+        return "expert_details", {
+            "expert_image": answers["expert_image"],
+            "expert_name": answers["expert_name"],
+            "expert_description": answers["expert_description"],
+            "expert_calendar": answers["expert_calendar"],
+        }
+    elif status == "consultationArranged":
+        return "consultation_details", {
+            "meeting_time": answers["meeting_time"],
+            "meeting_url": answers["meeting_url"],
+        }
+    elif status == "inputScopeEngagement":
+        return "scope_details", {
+            "scope_url": answers["scope_url"],
+        }
+    elif status == "inputPayment":
+        return "payment_details", {
+            "pay_instant_url": answers["pay_instant_url"],
+            "pay_invoice_url": answers["pay_invoice_url"],
+        }
+    elif status == "completed":
+        return "report_details", {
+            "report_title": answers["report_title"],
+            "report_author": answers["report_author"],
+            "report_loc": answers["report_loc"],
+        }
+    return None, None
+
+
+def update_query_dynamo(query, field, data):
+    # Now that we have the correct PK and SK, perform the update
+    update_expression = f"SET query_data.{field} = :new_data"
+    expression_attribute_values = {":new_data": data}
+
+    if query["is_public"] == "true":
+        suffix = "PUBLIC"
+    else:
+        suffix = f'USER#{query["submittor_id"]}'
+
+    keys = {
+        "PK": f"COMPANY#{query['company_id']}#{suffix}",
+        "SK": f"QUERY#{query['query_id']}",
+    }
+
+    update_response = core_table.update_item(
+        Key=keys,
+        UpdateExpression=update_expression,
+        ExpressionAttributeValues=expression_attribute_values,
+    )
+
+    print(update_response)
+
+
 def change_status(company_id, query):
     print(company_id, query)
     status_map = {
         "created": [],
         "assigned": ["expert_image", "expert_name", "expert_description"],
-        "scheduleConsultation": ["scheduler_url"],
+        "scheduleConsultation": [],
         "consultationArranged": ["meeting_time", "meeting_url"],
         "inputScopeEngagement": ["scope_url"],
-        "scopeAcceptance": ["scope_url"],
+        "scopeAcceptance": [],
         "inputPayment": ["pay_instant_url", "pay_invoice_url"],
-        "paymentComplete": ["payment_details", "invoice"],
+        "paymentComplete": [],
         "commenceWriting": [],
-        # "completed": ["report_loc"],
-        # "expertComment": ["comment_content"],
-        # "techDeskComment": ["comment_content"],
+        "completed": [],
         "Exit": [],
     }
     while True:
@@ -215,8 +262,7 @@ def change_status(company_id, query):
 
         if new_status == "Exit":
             break
-
-        if new_status in ["assigned", "scheduleConsultation", "expertComment"]:
+        if new_status == "assigned":
             questions = [
                 {
                     "type": "list",
@@ -226,33 +272,15 @@ def change_status(company_id, query):
                 }
             ]
             answers = prompt(questions)
+            print(answers)
             agent = agents[answers["expert"]]
             if new_status == "assigned":
                 answers = {
                     "expert_image": agent["image"],
                     "expert_name": agent["name"],
                     "expert_description": agent["description"],
+                    "expert_calendar": agent["calendar"],
                 }
-            elif new_status == "scheduleConsultation":
-                answers = {
-                    "scheduler_url": agent["calendar"],
-                }
-            elif new_status == "expertComment":
-                questions = [
-                    {
-                        "type": "input",
-                        "name": "comment_content",
-                        "message": "Please input comment text",
-                    }
-                ]
-                comment_answers = prompt(questions)
-                answers = {
-                    "commentor": agent["name"],
-                    "commentor_image": agent["image"],
-                    "comment_content": comment_answers["comment_content"],
-                }
-                new_status = "comment"
-
         else:
             questions = []
             for required_field in status_map[new_status]:
@@ -264,16 +292,27 @@ def change_status(company_id, query):
                     }
                 )
             answers = prompt(questions)
+
+        # add details to the query in dynamo.
+        query_field, query_field_details = parse_update_query_data(
+            status=new_status, answers=answers
+        )
+        if query_field:
+            update_query_dynamo(
+                query=query, field=query_field, data=query_field_details
+            )
+            print("added field")
+
+        # Create activity & update status
         sns_event = {
             "company_id": company_id,
             "author_id": query["submittor_id"],
             "query_id": query["query_id"],
             "event": new_status,
-            **answers,
         }
-        print(sns_event)
         publish_to_sns(json.dumps(sns_event))
 
+        # Add notification
         notification_badge = {
             "created": "Created",
             "assigned": "Assigned",

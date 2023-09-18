@@ -28,41 +28,10 @@ def update_fd_query(query, message_obj):
     return
 
 
-def parse_activity(status, raw_activity):
-    activity_data = {
-        "event": status,
-        "datetime": int((datetime.now()).timestamp()),
-    }
-    if status == "assigned":
-        activity_data["expert_image"] = raw_activity["expert_image"]
-        activity_data["expert_name"] = raw_activity["expert_name"]
-        activity_data["expert_description"] = raw_activity["expert_description"]
-
-    elif status == "scopeAcceptance":
-        activity_data["scope_url"] = raw_activity["scope_url"]
-
-    elif status == "paymentComplete":
-        activity_data["payment_details"] = raw_activity["payment_details"]
-        activity_data["invoice"] = raw_activity["invoice"]
-
-    elif status == "completed":
-        activity_data["report_title"] = raw_activity["report_title"]
-        activity_data["report_author"] = raw_activity["report_author"]
-        activity_data["report_loc"] = raw_activity["report_loc"]
-
-    elif status == "comment":
-        activity_data["commentor"] = raw_activity["commentor"]
-        activity_data["commentor_image"] = raw_activity["commentor_image"]
-        activity_data["comment_content"] = raw_activity["comment_content"]
-
-    elif status == "techDeskComment":
-        activity_data["comment_content"] = raw_activity["comment_content"]
-
-    return activity_data
-
-
-def create_activity_dynamo(query, activity_data):
+def create_activity_dynamo(query, activity_status, activity_data={}):
     activity_id = f"activity_{uuid.uuid4()}"
+    activity_data["event"] = activity_status
+    activity_data["datetime"] = (int((datetime.now()).timestamp()),)
 
     res = table.put_item(
         Item={
@@ -73,45 +42,6 @@ def create_activity_dynamo(query, activity_data):
     )
 
     return activity_data
-
-
-def parse_action(status, message):
-    if status == "scheduleConsultation":
-        return {"scheduler_url": message["scheduler_url"]}
-    elif status == "consultationArranged":
-        return {
-            "meeting_time": message["meeting_time"],
-            "meeting_url": message["meeting_url"],
-        }
-    elif status == "inputScopeEngagement":
-        return {
-            "scope_url": message["scope_url"],
-        }
-    elif status == "inputPayment":
-        return {
-            "pay_instant_url": message["pay_instant_url"],
-            "pay_invoice_url": message["pay_invoice_url"],
-        }
-    elif status == "completed":
-        return {
-            "report_title": message["report_title"],
-            "report_author": message["report_author"],
-            "report_loc": message["report_loc"],
-        }
-
-
-def update_action_dynamo(query, action_data):
-    # Now that we have the correct PK and SK, perform the update
-    update_expression = "SET query_data.action_data = :new_action_data"
-    expression_attribute_values = {":new_action_data": action_data}
-
-    update_response = table.update_item(
-        Key={"PK": query["PK"], "SK": query["SK"]},
-        UpdateExpression=update_expression,
-        ExpressionAttributeValues=expression_attribute_values,
-    )
-
-    print(update_response)
 
 
 def update_status(query, status):
@@ -155,43 +85,19 @@ def handle_sns(message):
         "scopeAcceptance",
         "paymentComplete",
         "completed",
-        "comment",
         "techDeskComment",
+        "comment",
     ]:
-        activity_data = parse_activity(status=status, raw_activity=message)
-        print(activity_data)
-
+        activity_data = {}
+        if status == "techDeskComment":
+            activity_data["comment_content"] = message["comment_content"]
+        if status == "comment":
+            activity_data["commentor"] = message["commentor"]
+            activity_data["comment_content"] = message["comment_content"]
+            activity_data["commentor_image"] = message["commentor_image"]
         create_activity_dynamo(
-            query=query,
-            activity_data=activity_data,
+            query=query, activity_status=status, activity_data=activity_data
         )
-        print("created activity in dynamo")
-
-        if status not in [
-            "comment",
-            "techDeskComment",
-        ]:
-            update_action_dynamo(
-                query=query,
-                action_data={},
-            )
-            print("action reset")
-    # Update action:
-    if status in [
-        "scheduleConsultation",
-        "consultationArranged",
-        "inputScopeEngagement",
-        "inputPayment",
-        "completed",
-    ]:
-        print("handle ACTION")
-        action_data = parse_action(status, message)
-        print(action_data)
-        update_action_dynamo(
-            query=query,
-            action_data=action_data,
-        )
-        print("action updated.")
 
     update_status(query=query, status=status)
     print("status updated")
@@ -254,10 +160,8 @@ def handle_post(company_id, query_id, event):
     if event_status == "comment":
         activity_data = {
             "commentor": event["requestContext"]["authorizer"]["name"],
-            "datetime": int((datetime.now()).timestamp()),
             "comment_content": body["comment_body"],
             "commentor_image": event["requestContext"]["authorizer"]["picture"],
-            "event": "comment",
         }
 
     if activity_data:

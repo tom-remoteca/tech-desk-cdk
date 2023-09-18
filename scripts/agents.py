@@ -13,10 +13,12 @@ agents = {
     },
 }
 
+"""
+1694470860
+https://meet.google.com/egn-ygzv-yfe
 
-# 1694470861
-# https://meet.google.com/egn-ygzv-yfe
-# Engagement https://docs.google.com/document/d/1YIQxiSO04l8dsog0TUK4NaiLy26YahxEmpvpUwAruNs/edit?usp=sharing
+https://docs.google.com/document/d/1YIQxiSO04l8dsog0TUK4NaiLy26YahxEmpvpUwAruNs/edit?usp=sharing
 
-# https://pay.techdeskportal.com/b/test_9AQ8zgc5DfWxdSE8ww
-# https://invoice.stripe.com/i/acct_1Nn4RUDZDznHrJwB/test_YWNjdF8xTm40UlVEWkR6bkhySndCLF9PY2QyN2lUOUV5WDlQN3VNMFZIcHFJOHgxaTFsQ2JSLDg1MDMyMTEx0200vDB2Yjio?s=db
+https://pay.techdeskportal.com/b/test_9AQ8zgc5DfWxdSE8ww
+https://invoice.stripe.com/i/acct_1Nn4RUDZDznHrJwB/test_YWNjdF8xTm40UlVEWkR6bkhySndCLF9PY2QyN2lUOUV5WDlQN3VNMFZIcHFJOHgxaTFsQ2JSLDg1MDMyMTEx0200vDB2Yjio?s=db
+"""
