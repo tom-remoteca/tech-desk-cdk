@@ -51,20 +51,20 @@ def handle_get(company_id, user_id):
         "SK": "REPORT#",
     }
 
-    response_priv = table.query(
+    reponse_public = table.query(
         KeyConditionExpression=Key("PK").eq(primary_key_public["PK"])
         & Key("SK").begins_with(primary_key_public["SK"]),
     )
 
     # Extract the items (queries) from the responses and de-duplicate
-    items_priv = response_priv["Items"]
-    items_public = primary_key_public["Items"]
+    items_priv = response_priv.get("Items", [])
+    items_public = reponse_public.get("Items", [])
 
     report_ids = set([item["SK"] for item in items_priv])
     items_public = [item for item in items_public if item["SK"] not in report_ids]
 
-    items = items_priv + items_public
+    all_items = items_priv + items_public
 
-    res = [item["query_data"] for item in items]
+    res = [item["report_data"] for item in all_items]
 
     return response(200, res)

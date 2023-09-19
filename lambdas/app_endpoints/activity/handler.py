@@ -167,12 +167,12 @@ def handle_post(company_id, query_id, event):
     if activity_data:
         create_activity_dynamo(
             query=query,
+            activity_status=event_status,
             activity_data=activity_data,
         )
         update_fd_query(
             query=query, message_obj={"status": event_status, **activity_data}
         )
-        print("fd updated")
         return response(200, activity_data)
 
     return response(400, "")

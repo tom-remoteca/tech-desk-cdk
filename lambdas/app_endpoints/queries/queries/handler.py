@@ -266,14 +266,14 @@ def handle_get(company_id, user_id):
     )
 
     # Extract the items (queries) from the responses and de-duplicate
-    items_user = response_user["Items"]
-    items_public = response_public["Items"]
+    items_priv = response_user.get("Items", [])
+    items_public = response_public.get("Items", [])
 
-    query_ids = set([item["SK"] for item in items_user])
-    items_public = [item for item in items_public if item["SK"] not in query_ids]
+    report_ids = set([item["SK"] for item in items_priv])
+    items_public = [item for item in items_public if item["SK"] not in report_ids]
 
-    items = items_user + items_public
+    all_items = items_priv + items_public
 
-    res = [item["query_data"] for item in items]
+    res = [item["query_data"] for item in all_items]
 
     return response(200, res)

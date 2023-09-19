@@ -2,7 +2,7 @@ agents = {
     "Paul Jenshen": {
         "name": "Paul J",
         "image": "https://lh3.googleusercontent.com/a/AAcHTtfvQmA5qyjRxtRm4o052aZCeAYnKVgBtgS05_-CBcre=s96-c",
-        "description": "paul is someone who loves to munch on various citrus fruits",
+        "description": "I'm Paul, a seasoned technical accountant with over 20 years of experience in the financial sector. Specializing in complex accounting regulations, I've assisted numerous organizations in navigating the intricate world of financial compliance and reporting. Leveraging a blend of technical expertise and strategic insights, my aim is to ensure that your financial records are not only accurate but also optimized for your business goals. Let's collaborate to elevate your financial operations to the next level.",
         "calendar": "https://calendar.google.com/calendar/appointments/schedules/AcZssZ0IpHIsNk_xhWp424jB8B3PtiVL17fqArb7_tk0jCCztoFu6BY0CbC3xU6xTW-ZKJwlIW6sdMdo?gv=true",
     },
     "Tom Davis": {
