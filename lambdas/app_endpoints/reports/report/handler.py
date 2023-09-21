@@ -9,6 +9,25 @@ from botocore.exceptions import ClientError
 # Create the DynamoDB client
 dynamodb = boto3.resource("dynamodb")
 table = dynamodb.Table(os.environ["CORE_TABLE_NAME"])
+_lambda = boto3.client("lambda")
+
+s3 = boto3.client("s3")
+BUCKET = os.environ["BUCKET_NAME"]
+
+
+def add_attachment_links(report_data):
+    assets = report_data.get("assets", [])
+    for assets in assets:
+        resp = _lambda.invoke(
+            FunctionName=os.environ["SIGNED_URL_GENERATOR_FUNCTION_NAME"],
+            Payload=json.dumps({"key": assets["file_key"]}),
+        )
+        body = json.loads(resp["Payload"].read())
+        print(body)
+
+        assets["signed_url"] = body["signed_url"]
+
+    return report_data
 
 
 def response(status_code, body={}):
@@ -49,7 +68,9 @@ def handle_get(company_id, user_id, report_id: str):
 
         # If an item is found using private keys, return
         if res["Items"]:
-            return response(200, res["Items"][0]["query_data"])
+            report_data = res["Items"][0]["report_data"]
+            report_data = add_attachment_links(report_data)
+            return response(200, report_data)
     except ClientError:
         pass  # If there's an error, it'll proceed to the public key lookup
 
@@ -67,7 +88,9 @@ def handle_get(company_id, user_id, report_id: str):
 
         # If an item is found using public keys, return
         if res["Items"]:
-            return response(200, res["Items"][0]["query_data"])
+            report_data = res["Items"][0]["report_data"]
+            report_data = add_attachment_links(report_data)
+            return response(200, report_data)
     except ClientError:
         pass  # You can handle the error as appropriate for your application
 

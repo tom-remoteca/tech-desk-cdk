@@ -1,8 +1,15 @@
+import os
 from aws_cdk import aws_s3 as s3
 from aws_cdk import aws_iam as iam
 from aws_cdk import aws_dynamodb as dynamodb
+from aws_cdk import aws_route53 as route53
 from aws_cdk import CfnOutput, Stack
 from aws_cdk import aws_sns as sns
+from aws_cdk import aws_certificatemanager as acm
+from aws_cdk import aws_cloudfront as cloudfront
+from aws_cdk import aws_cloudfront_origins as origins
+from aws_cdk import aws_lambda as _lambda
+from aws_cdk import Stack, Duration, Environment
 
 
 class CoreStack(Stack):
@@ -20,6 +27,14 @@ class CoreStack(Stack):
             self,
             "Bucket",
             block_public_access=s3.BlockPublicAccess.BLOCK_ALL,
+            cors=[
+                s3.CorsRule(
+                    allowed_methods=[s3.HttpMethods.GET],
+                    allowed_origins=["http://localhost:3000"],
+                    allowed_headers=["*"],
+                    max_age=3000,
+                )
+            ],
         )
         self.bucket = bucket
 
@@ -116,3 +131,92 @@ class CoreStack(Stack):
             "NextAuthUserSecretAccessKey",
             value=access_key.attr_secret_access_key,
         )
+
+        hosted_zone = route53.HostedZone.from_hosted_zone_attributes(
+            self,
+            "HostedZone",
+            zone_name=config["DOMAIN_NAME"],
+            hosted_zone_id=config["HOSTED_ZONE_ID"],
+        )
+        self.hosted_zone = hosted_zone
+
+        api_gw_cert = acm.Certificate(
+            self,
+            "ApiGwCertificate",
+            domain_name=config["DOMAIN_NAME"],
+            subject_alternative_names=[f"*.{config['DOMAIN_NAME']}"],
+            validation=acm.CertificateValidation.from_dns(hosted_zone),
+        )
+        self.certificate = api_gw_cert
+
+        cf_cert = acm.Certificate.from_certificate_arn(
+            self, "CloudfrontCertificate", certificate_arn=config["CERTIFICATE_ARN"]
+        )
+
+        pub_key = cloudfront.PublicKey(
+            self, "PublicKey", encoded_key=config["CLOUDFRONT_PUB_KEY"]
+        )
+
+        no_cache_policy = cloudfront.CachePolicy(
+            self,
+            "NoCachePolicy",
+            cache_policy_name="NoCachePolicy",
+            default_ttl=Duration.seconds(0),
+            max_ttl=Duration.seconds(0),
+            min_ttl=Duration.seconds(0),
+            comment="Cache policy with no caching",
+            header_behavior=cloudfront.CacheHeaderBehavior.none(),
+            cookie_behavior=cloudfront.CacheCookieBehavior.none(),
+            query_string_behavior=cloudfront.CacheQueryStringBehavior.none(),
+            enable_accept_encoding_brotli=False,
+            enable_accept_encoding_gzip=False,
+        )
+
+        oai = cloudfront.OriginAccessIdentity(self, "OAI")
+        bucket.grant_read(oai)
+
+        distribution = cloudfront.Distribution(
+            self,
+            "Distribution",
+            default_behavior=cloudfront.BehaviorOptions(
+                origin=origins.S3Origin(bucket=bucket, origin_access_identity=oai),
+                viewer_protocol_policy=cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
+                cache_policy=no_cache_policy,
+                trusted_key_groups=[
+                    cloudfront.KeyGroup(self, "signedKeyGroup", items=[pub_key])
+                ],
+            ),
+            domain_names=[f"files.{config['DOMAIN_NAME']}"],
+            certificate=cf_cert,
+        )
+
+        route53.CnameRecord(
+            self,
+            "CnameRecord",
+            record_name="files",
+            zone=hosted_zone,
+            domain_name=distribution.distribution_domain_name,
+        )
+
+        generate_url_function = _lambda.Function(
+            self,
+            "GeneratePresignedUrlFunction",
+            runtime=_lambda.Runtime.PYTHON_3_8,
+            handler="handler.handler",
+            code=_lambda.Code.from_asset(
+                f"{os.path.dirname(__file__)}/../lambdas/generate_presigned_url"
+            ),
+            environment={
+                "BUCKET_NAME": bucket.bucket_name,
+                "CUSTOM_DOMAIN": f"https://files.{config['DOMAIN_NAME']}",
+                "KEY_KEY_ID": pub_key.public_key_id,
+            },
+        )
+        ssm_policy = iam.PolicyStatement(
+            actions=["secretsmanager:GetSecretValue"],
+            resources=[
+                "arn:aws:secretsmanager:eu-west-2:322517305488:secret:SIGNING-PRIVATE-KEY-LFfOAS"
+            ],
+        )
+        generate_url_function.role.add_to_policy(ssm_policy)
+        self.signed_url_generator = generate_url_function

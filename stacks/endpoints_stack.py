@@ -22,6 +22,7 @@ class EndpointsStack(Stack):
         core_table: dynamodb.Table,
         core_bucket: s3.Bucket,
         activity_topic: sns.Topic,
+        signed_url_generator: _lambda.Function,
         **kwargs,
     ) -> None:
         super().__init__(scope, id, **kwargs)
@@ -98,14 +99,15 @@ class EndpointsStack(Stack):
             code=_lambda.Code.from_asset(
                 f"{os.path.dirname(__file__)}/../lambdas/app_endpoints/queries/query"
             ),
+            timeout=Duration.seconds(10),
             environment={
                 "CORE_TABLE_NAME": core_table.table_name,
                 "BUCKET_NAME": core_bucket.bucket_name,
+                "SIGNED_URL_GENERATOR_FUNCTION_NAME": signed_url_generator.function_name,
             },
         )
-
         core_table.grant_read_write_data(query_lambda)
-        core_bucket.grant_put(query_lambda)
+        signed_url_generator.grant_invoke(query_lambda)
 
         notifications_lambda = _lambda.Function(
             self,
@@ -186,7 +188,6 @@ class EndpointsStack(Stack):
                 "CORE_TABLE_NAME": core_table.table_name,
             },
         )
-
         core_table.grant_read_write_data(reports_lambda)
 
         report_lambda = _lambda.Function(
@@ -197,12 +198,15 @@ class EndpointsStack(Stack):
             code=_lambda.Code.from_asset(
                 f"{os.path.dirname(__file__)}/../lambdas/app_endpoints/reports/report"
             ),
+            timeout=Duration.seconds(10),
             environment={
                 "CORE_TABLE_NAME": core_table.table_name,
+                "BUCKET_NAME": core_bucket.bucket_name,
+                "SIGNED_URL_GENERATOR_FUNCTION_NAME": signed_url_generator.function_name,
             },
         )
-
         core_table.grant_read_write_data(report_lambda)
+        signed_url_generator.grant_invoke(report_lambda)
 
         ai_api = api.root.add_resource("ai")
         ai_query = ai_api.add_resource("new_query")
