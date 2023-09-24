@@ -30,7 +30,10 @@ class CoreStack(Stack):
             cors=[
                 s3.CorsRule(
                     allowed_methods=[s3.HttpMethods.GET],
-                    allowed_origins=["http://localhost:3000"],
+                    allowed_origins=[
+                        "http://localhost:3000",
+                        "https://www.techdeskportal.com",
+                    ],
                     allowed_headers=["*"],
                     max_age=3000,
                 )
@@ -185,6 +188,8 @@ class CoreStack(Stack):
                 trusted_key_groups=[
                     cloudfront.KeyGroup(self, "signedKeyGroup", items=[pub_key])
                 ],
+                allowed_methods=cloudfront.AllowedMethods.ALLOW_GET_HEAD_OPTIONS,
+                cached_methods=cloudfront.CachedMethods.CACHE_GET_HEAD,
             ),
             domain_names=[f"files.{config['DOMAIN_NAME']}"],
             certificate=cf_cert,
@@ -212,6 +217,7 @@ class CoreStack(Stack):
                 "KEY_KEY_ID": pub_key.public_key_id,
             },
         )
+
         ssm_policy = iam.PolicyStatement(
             actions=["secretsmanager:GetSecretValue"],
             resources=[
@@ -219,4 +225,12 @@ class CoreStack(Stack):
             ],
         )
         generate_url_function.role.add_to_policy(ssm_policy)
+
+        # alias = _lambda.Alias(
+        #     self,
+        #     "Alias",
+        #     alias_name="live",
+        #     version=generate_url_function.current_version,
+        #     provisioned_concurrent_executions=1,
+        # )
         self.signed_url_generator = generate_url_function

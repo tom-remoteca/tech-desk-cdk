@@ -41,8 +41,8 @@ class APIStack(Stack):
             ),
         )
 
-        api.rest_api_root_resource_id
-        api.rest_api_id
+        # api.rest_api_root_resource_id
+        # api.rest_api_id
         self.api = api
         route53.ARecord(
             self,

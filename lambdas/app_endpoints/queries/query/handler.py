@@ -16,16 +16,23 @@ BUCKET = os.environ["BUCKET_NAME"]
 
 
 def add_attachment_links(query_data):
-    attachments = query_data.get("attachments", [])
-    for attachment in attachments:
+    # Add signed urls to attachments
+    for attachment in query_data.get("attachments", []):
         resp = _lambda.invoke(
             FunctionName=os.environ["SIGNED_URL_GENERATOR_FUNCTION_NAME"],
             Payload=json.dumps({"key": attachment["file_key"]}),
         )
         body = json.loads(resp["Payload"].read())
-        print(body)
-
         attachment["signed_url"] = body["signed_url"]
+
+    # Add signed urls to report assets
+    for asset in query_data.get("report_details", {}).get("assets", []):
+        resp = _lambda.invoke(
+            FunctionName=os.environ["SIGNED_URL_GENERATOR_FUNCTION_NAME"],
+            Payload=json.dumps({"key": asset["asset_key"]}),
+        )
+        body = json.loads(resp["Payload"].read())
+        asset["signed_url"] = body["signed_url"]
 
     return query_data
 

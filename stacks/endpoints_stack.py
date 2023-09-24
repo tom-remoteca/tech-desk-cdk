@@ -190,24 +190,6 @@ class EndpointsStack(Stack):
         )
         core_table.grant_read_write_data(reports_lambda)
 
-        report_lambda = _lambda.Function(
-            self,
-            "ReportLambda",
-            handler="handler.handler",
-            runtime=_lambda.Runtime.PYTHON_3_9,
-            code=_lambda.Code.from_asset(
-                f"{os.path.dirname(__file__)}/../lambdas/app_endpoints/reports/report"
-            ),
-            timeout=Duration.seconds(10),
-            environment={
-                "CORE_TABLE_NAME": core_table.table_name,
-                "BUCKET_NAME": core_bucket.bucket_name,
-                "SIGNED_URL_GENERATOR_FUNCTION_NAME": signed_url_generator.function_name,
-            },
-        )
-        core_table.grant_read_write_data(report_lambda)
-        signed_url_generator.grant_invoke(report_lambda)
-
         ai_api = api.root.add_resource("ai")
         ai_query = ai_api.add_resource("new_query")
         ai_history = ai_api.add_resource("history")
@@ -218,7 +200,6 @@ class EndpointsStack(Stack):
         activity_api = query_api.add_resource("activity")
 
         reports_api = api.root.add_resource("reports")
-        report_api = reports_api.add_resource("{report_id}")
 
         users_api = api.root.add_resource("users")
         user_api = users_api.add_resource("{user_id}")
@@ -307,11 +288,5 @@ class EndpointsStack(Stack):
         reports_api.add_method(
             "GET",
             apigateway.LambdaIntegration(reports_lambda),
-            authorizer=api_authorizer,
-        )
-
-        report_api.add_method(
-            "GET",
-            apigateway.LambdaIntegration(report_lambda),
             authorizer=api_authorizer,
         )
