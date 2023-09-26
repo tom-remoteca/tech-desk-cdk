@@ -72,11 +72,12 @@ def handle_get(company_id, user_id, query_id: str):
             KeyConditionExpression=Key("PK").eq(primary_key_private["PK"])
             & Key("SK").eq(primary_key_private["SK"]),
         )
-
+        print("q-ed")
         # If an item is found using private keys, return
         if res["Items"]:
             query_data = res["Items"][0]["query_data"]
             query_data = add_attachment_links(query_data)
+            print("attachmented")
             return response(200, query_data)
     except ClientError:
         pass  # If there's an error, it'll proceed to the public key lookup
@@ -92,14 +93,14 @@ def handle_get(company_id, user_id, query_id: str):
             KeyConditionExpression=Key("PK").eq(primary_key_public["PK"])
             & Key("SK").eq(primary_key_public["SK"]),
         )
+        print("q-ed pub")
 
         # If an item is found using public keys, return
         if res["Items"]:
             query_data = res["Items"][0]["query_data"]
             query_data = add_attachment_links(query_data)
+            print("attachmented")
             return response(200, query_data)
     except ClientError:
-        pass  # You can handle the error as appropriate for your application
-
-    # If neither private nor public returns an item, the user doesn't have access
+        pass
     return response(403, "User doesn't have access to the query")

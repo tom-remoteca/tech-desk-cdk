@@ -31,7 +31,7 @@ def update_fd_query(query, message_obj):
 def create_activity_dynamo(query, activity_status, activity_data={}):
     activity_id = f"activity_{uuid.uuid4()}"
     activity_data["event"] = activity_status
-    activity_data["datetime"] = (int((datetime.now()).timestamp()),)
+    activity_data["datetime"] = int((datetime.now()).timestamp())
 
     res = table.put_item(
         Item={
@@ -84,6 +84,7 @@ def handle_sns(message):
         "assigned",
         "scopeAcceptance",
         "paymentComplete",
+        "reviewPaper",
         "completed",
         "techDeskComment",
         "comment",

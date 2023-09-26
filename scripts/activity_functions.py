@@ -100,11 +100,6 @@ def complete_add_report(company_id, query):
             "name": "report_author",
             "message": "Report Author:",
         },
-        {
-            "type": "input",
-            "name": "report_location_key",
-            "message": "s3 key:",
-        },
     ]
     report_id = f"report_{uuid.uuid4()}"
     answers = prompt(questions)
@@ -125,7 +120,6 @@ def complete_add_report(company_id, query):
         "id": report_id,
         "report_title": answers["report_title"],
         "report_author": answers["report_author"],
-        "report_loc": answers["report_location_key"],
         "query_id": query["id"],
         "date": int(time.time() * 1000),
     }
@@ -146,7 +140,43 @@ def complete_add_report(company_id, query):
     }
     print(sns_event)
     publish_to_sns(json.dumps(sns_event))
-    update_query_dynamo(query=query, field="report_details", data=report_data)
+    assets = []
+    print(report_id)
+    while True:
+        questions = [
+            {
+                "type": "input",
+                "name": "asset_title",
+                "message": "Asset name:",
+            },
+            {
+                "type": "input",
+                "name": "asset_key",
+                "message": "Asset Key:",
+            },
+        ]
+        answers = prompt(questions)
+        assets.append(answers)
+        questions = [
+            {
+                "type": "list",
+                "name": "asset_to_add",
+                "message": "Add another??",
+                "choices": ["yes", "no"],
+            },
+        ]
+        answers = prompt(questions)
+        if answers["asset_to_add"] == "no":
+            break
+
+    report_details = {
+        "report_title": report_data["report_title"],
+        "report_author": report_data["report_author"],
+        "assets": assets,
+        "id": report_id,
+        "date": int(time.time() * 1000),
+    }
+    update_query_dynamo(query=query, field="report_details", data=report_details)
     return
 
 
@@ -245,6 +275,7 @@ def change_status(company_id, query):
         "inputPayment": ["pay_instant_url", "pay_invoice_url"],
         "paymentComplete": [],
         "commenceWriting": [],
+        "reviewPaper": [],
         "completed": [],
         "Exit": [],
     }
@@ -323,6 +354,7 @@ def change_status(company_id, query):
             "inputPayment": "Payment Required",
             # "paymentComplete": ["payment_details", "invoice"],
             # "commenceWriting": "",
+            "reviewPaper": "Review Paper",
             "completed": "Paper Complete",
             "comment": "New Comments",
             "expertComment": "New Comments",
