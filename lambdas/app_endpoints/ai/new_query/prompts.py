@@ -59,45 +59,47 @@ models = {
     "ASC 842": {
         "kwip_source": "asc842",
         "source_urls": {
-            "https://techdesk-ai-assets.s3.eu-west-2.amazonaws.com/ASC+842.html": "ASC 842"
+            "https://techdesk-ai-assets.s3.eu-west-2.amazonaws.com/ASC+842.pdf": "ASC 842"
         },
     },
     "IFRS 15": {
         "kwip_source": "ifrs15",
         "source_urls": {
-            "https://techdesk-ai-assets.s3.eu-west-2.amazonaws.com/ifrs-15-revenue-from-contracts-with-customers+Basis+for+conclusions.html": "IFRS 15 Basis for Conclusions",
-            "https://techdesk-ai-assets.s3.eu-west-2.amazonaws.com/ifrs-15-revenue-from-contracts-with-customers+Illustrative+examples.html": "IFRS 15 Illustrative Examples",
-            "https://techdesk-ai-assets.s3.eu-west-2.amazonaws.com/ifrs-15-revenue-from-contracts-with-customers.html": "IFRS 15",
+            "https://techdesk-ai-assets.s3.eu-west-2.amazonaws.com/ifrs-15-revenue-from-contracts-with-customers+Basis+for+conclusions.pdf": "IFRS 15 Basis for Conclusions",
+            "https://techdesk-ai-assets.s3.eu-west-2.amazonaws.com/ifrs-15-revenue-from-contracts-with-customers+Illustrative+examples.pdf": "IFRS 15 Illustrative Examples",
+            "https://techdesk-ai-assets.s3.eu-west-2.amazonaws.com/ifrs-15-revenue-from-contracts-with-customers.pdf": "IFRS 15",
         },
     },
     "IFRS 16": {
         "kwip_source": "ifrs16",
         "source_urls": {
-            "https://techdesk-ai-assets.s3.eu-west-2.amazonaws.com/ifrs-16-leases+basis+for+conclusions.html": "IFRS 16 Basis for Conclusions",
-            "https://techdesk-ai-assets.s3.eu-west-2.amazonaws.com/ifrs-16-leases+illusrative+examples.html": "IFRS 16 Illustrative Examples",
-            "https://techdesk-ai-assets.s3.eu-west-2.amazonaws.com/ifrs-16-leases.html": "IFRS 16",
+            "https://techdesk-ai-assets.s3.eu-west-2.amazonaws.com/ifrs-16-leases+basis+for+conclusions.pdf": "IFRS 16 Basis for Conclusions",
+            "https://techdesk-ai-assets.s3.eu-west-2.amazonaws.com/ifrs-16-leases+illusrative+examples.pdf": "IFRS 16 Illustrative Examples",
+            "https://techdesk-ai-assets.s3.eu-west-2.amazonaws.com/ifrs-16-leases.pdf": "IFRS 16",
         },
     },
     "IFRS 17": {
         "kwip_source": "ifrs17",
         "source_urls": {
-            "https://techdesk-ai-assets.s3.eu-west-2.amazonaws.com/ifrs-17-insurance-contracts+Basis+for+conclusions.html": "IFRS 17 Basis for Conclusions",
-            "https://techdesk-ai-assets.s3.eu-west-2.amazonaws.com/ifrs-17-insurance-contracts+Illustrative+examples.html": "IFRS 17 Illustrative Examples",
-            "https://techdesk-ai-assets.s3.eu-west-2.amazonaws.com/ifrs-17-insurance-contracts.html": "IFRS 17",
+            "https://techdesk-ai-assets.s3.eu-west-2.amazonaws.com/ifrs-17-insurance-contracts+Basis+for+conclusions.pdf": "IFRS 17 Basis for Conclusions",
+            "https://techdesk-ai-assets.s3.eu-west-2.amazonaws.com/ifrs-17-insurance-contracts+Illustrative+examples.pdf": "IFRS 17 Illustrative Examples",
+            "https://techdesk-ai-assets.s3.eu-west-2.amazonaws.com/ifrs-17-insurance-contracts.pdf": "IFRS 17",
         },
     },
     "Income Tax Legislation - UK": {
-        "kwip_source": "IncomeTax",
+        "kwip_source": "IncomeTaxUK",
         "source_urls": {
-            "https://techdesk-ai-assets.s3.eu-west-2.amazonaws.com/the+Income+Tax+(Trading+and+Other+Income)+Act+2005.html": "Income Tax (Trading and Other Income) Act 2005",
-            "https://techdesk-ai-assets.s3.eu-west-2.amazonaws.com/Income+Tax+Act+2007.html": "Income Tax Act 2007",
-            "https://techdesk-ai-assets.s3.eu-west-2.amazonaws.com/Income+Tax+(Earnings+and+Pensions)+Act+2003.html": "Income Tax (Earnings and Pensions) Act 2003",
+            "https://techdesk-ai-assets.s3.eu-west-2.amazonaws.com/the+Income+Tax+(Trading+and+Other+Income)+Act+2005.pdf": "Income Tax (Trading and Other Income) Act 2005",
+            "https://techdesk-ai-assets.s3.eu-west-2.amazonaws.com/Income+Tax+Act+2007.pdf": "Income Tax Act 2007",
+            "https://techdesk-ai-assets.s3.eu-west-2.amazonaws.com/Income+Tax+(Earnings+and+Pensions)+Act+2003.pdf": "Income Tax (Earnings and Pensions) Act 2003",
+            "https://techdesk-ai-assets.s3.eu-west-2.amazonaws.com/Finance+Act+2023.pdf": "Finance Act 2023",
+            "https://techdesk-ai-assets.s3.eu-west-2.amazonaws.com/Finance+(No.2)+Act+2023.pdf": "Finance (No.2) Act 2023",
         },
     },
     "OECD Transfer Pricing": {
         "kwip_source": "OECDTransferPricing",
         "source_urls": {
-            "https://techdesk-ai-assets.s3.eu-west-2.amazonaws.com/OECD+Transfer+Pricing+Guidelines+for+Multinational+Enterprises+and+Tax+Administrations+2022.html": "OECD Transfer Pricing Guidelines for Multinational Enterprises and Tax Administrations 2022",
+            "https://techdesk-ai-assets.s3.eu-west-2.amazonaws.com/OECD+Transfer+Pricing+2022.pdf": "OECD Transfer Pricing Guidelines for Multinational Enterprises and Tax Administrations 2022",
         },
     },
 }
@@ -122,5 +124,7 @@ def create_kwip_prompt(
 def sanitise_kwip_response(model, ai_response):
     if models[model].get("source_urls"):
         for source_url, source_replace in models[model]["source_urls"].items():
+            ai_response = ai_response.replace(f"[Link]({source_url})", "")
+            ai_response = ai_response.replace(f"({source_url})", "")
             ai_response = ai_response.replace(source_url, source_replace)
     return ai_response
