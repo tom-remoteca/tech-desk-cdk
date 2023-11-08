@@ -104,9 +104,11 @@ models = {
     },
 }
 
+# gpt_model = "gpt-3.5-turbo"
+
 
 def create_kwip_prompt(
-    model: str, query: str, output_format="markdown", gpt_model="gpt-3.5-turbo"
+    model: str, query: str, output_format="markdown", gpt_model="gpt-4-1106-preview"
 ):
     kwip_body = {"output_format": output_format, "model_name": gpt_model, "debug": True}
 
