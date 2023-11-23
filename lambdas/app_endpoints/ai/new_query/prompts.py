@@ -1,5 +1,5 @@
 sources_prompt = """Given the following extracted parts of a long document and a question, create a final answer with references ("SOURCES"). 
-If you don't know the answer, just say that you don't know. Don't try to make up an answer. The examples below are given in English, please return all your answers in Japanese. 
+If you don't know the answer, just say that you don't know. Don't try to make up an answer.
 ALWAYS return a "SOURCES" part in your answer.
 
 ---EXAMPLES START---
@@ -103,7 +103,7 @@ models = {
         },
     },
 }
-
+# The examples below are given in English, please return all your answers in Japanese.
 # gpt_model = "gpt-3.5-turbo"
 
 

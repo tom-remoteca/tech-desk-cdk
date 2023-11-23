@@ -216,6 +216,11 @@ def parse_update_query_data(status, answers):
             "expert_description": answers["expert_description"],
             "expert_calendar": answers["expert_calendar"],
         }
+    elif status == "expertSignedNDA":
+        return "nda_details", {
+            "nda_url": answers["nda_url"],
+        }
+
     elif status == "consultationArranged":
         return "consultation_details", {
             "meeting_time": answers["meeting_time"],
@@ -268,6 +273,7 @@ def change_status(company_id, query):
     status_map = {
         "created": [],
         "assigned": ["expert_image", "expert_name", "expert_description"],
+        "expertSignedNDA": ["nda_url"],
         "scheduleConsultation": [],
         "consultationArranged": ["meeting_time", "meeting_url"],
         "inputScopeEngagement": ["scope_url"],

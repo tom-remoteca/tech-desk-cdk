@@ -1,6 +1,7 @@
 from aws_cdk import aws_lambda as _lambda
 from aws_cdk import aws_dynamodb as dynamodb
 from aws_cdk import aws_apigateway as apigateway
+from aws_cdk import aws_iam as iam
 
 from constructs import Construct
 from aws_cdk import CfnOutput, Stack, SecretValue
@@ -63,6 +64,28 @@ class InviteStack(Stack):
 
         invite_table.grant_read_write_data(create_token_lambda)
 
+        # send_invite_email Lambda function
+        send_email_lambda = _lambda.Function(
+            self,
+            "SendInviteEmail",
+            handler="handler.handler",
+            runtime=_lambda.Runtime.PYTHON_3_9,
+            code=_lambda.Code.from_asset(
+                f"{os.path.dirname(__file__)}/../lambdas/invite/send_invite_email"
+            ),
+            environment={
+                "INVITE_TABLE_NAME": invite_table.table_name,
+            },
+        )
+
+        invite_table.grant_read_write_data(send_email_lambda)
+        ses_policy = iam.PolicyStatement(
+            actions=["ses:SendEmail", "ses:SendRawEmail"],
+            resources=["*"],  # You can restrict this further if needed
+            effect=iam.Effect.ALLOW,
+        )
+        send_email_lambda.add_to_role_policy(ses_policy)
+
         contact_us_lambda = _lambda.Function(
             self,
             "ContactUsLambda",
@@ -75,8 +98,14 @@ class InviteStack(Stack):
 
         invite_api = api.root.add_resource("invite")
         lookup_invite_api = invite_api.add_resource("lookup")
+        send_email_invite_api = invite_api.add_resource("email")
         create_invite_api = invite_api.add_resource("create")
         contact_api = api.root.add_resource("contact")
+
+        send_email_invite_api.add_method(
+            "POST",
+            apigateway.LambdaIntegration(send_email_lambda),
+        )
 
         lookup_invite_api.add_method(
             "GET",
@@ -89,6 +118,4 @@ class InviteStack(Stack):
             authorizer=api_authorizer,
         )
 
-        contact_api.add_method(
-            "POST", apigateway.LambdaIntegration(contact_us_lambda)
-        )
+        contact_api.add_method("POST", apigateway.LambdaIntegration(contact_us_lambda))

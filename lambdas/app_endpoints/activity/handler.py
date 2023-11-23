@@ -82,6 +82,7 @@ def handle_sns(message):
         "created",
         "commenceWriting",
         "assigned",
+        "expertSignedNDA",
         "scopeAcceptance",
         "paymentComplete",
         "reviewPaper",
