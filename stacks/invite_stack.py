@@ -103,8 +103,9 @@ class InviteStack(Stack):
         contact_api = api.root.add_resource("contact")
 
         send_email_invite_api.add_method(
-            "POST",
+            "GET",
             apigateway.LambdaIntegration(send_email_lambda),
+            authorizer=api_authorizer,
         )
 
         lookup_invite_api.add_method(
