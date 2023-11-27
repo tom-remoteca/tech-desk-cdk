@@ -85,6 +85,8 @@ class EndpointsStack(Stack):
                 "BUCKET_NAME": core_bucket.bucket_name,
                 "ACTIVITY_TOPIC": activity_topic.topic_arn,
             },
+            timeout=Duration.seconds(60),
+            memory_size=512,
         )
         activity_topic.grant_publish(queries_lambda)
         core_table.grant_read_write_data(queries_lambda)

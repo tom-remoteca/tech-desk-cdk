@@ -131,6 +131,7 @@ def parse_raw_query(query_id, event):
     out["query_id"] = query_id
     for k, v in form_data.items():
         if k.startswith("file-"):
+            print("saving file to s3")
             attachment_id, file_key = write_file_to_s3(query_id=query_id, file_data=v)
             attachments.append(
                 {
@@ -191,10 +192,9 @@ def response(status_code, body):
 
 
 def handler(event, context):
-    print(event)
     user_id = event["requestContext"]["authorizer"]["user_id"]
     company_id = event["requestContext"]["authorizer"]["company_id"]
-    print(user_id)
+    print("UserID", user_id)
     if event["httpMethod"] == "GET":
         return handle_get(company_id, user_id)
 
@@ -209,6 +209,7 @@ def handle_post(company_id, user_id, event):
 
     # Process data in webkit form and save attachments to s3
     parsed_query = parse_raw_query(query_id, event)
+    print("parsed raw")
     parsed_query["submittor_id"] = user_id
     parsed_query["submittor_email"] = event["requestContext"]["authorizer"]["email"]
     parsed_query["company_name"] = event["requestContext"]["authorizer"]["company_name"]
@@ -220,17 +221,19 @@ def handle_post(company_id, user_id, event):
 
     # Send Query to FreshDesk
     ticket_id = create_query_freshdesk(parsed_query)
+    print("Submitted to freshdesk")
 
     if not ticket_id:
         return response(501, "E3012")
 
     parsed_query["ticket_id"] = ticket_id
-
+    print(parsed_query)
     # Save this request to Dynamo
     create_query_dynamo(company_id, user_id, query_id, parsed_query)
-
+    print("created query in dynamo")
     # add the created activity to this
     add_created_activity(company_id=company_id, query_id=query_id, user_id=user_id)
+    print("added created activity")
     return response(200, parsed_query)
 
 
