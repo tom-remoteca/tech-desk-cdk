@@ -43,6 +43,16 @@ def sign_url(url_to_sign):
 
 def handler(event, context):
     print(event)
-    s3_obj_key = event["key"]
-    url_to_sign = f"{CUSTOM_DOMAIN}/{s3_obj_key}"
-    return {"signed_url": sign_url(url_to_sign)}
+    key = event.get("key", None)
+    if key:
+        url_to_sign = f"{CUSTOM_DOMAIN}/{key}"
+        return {"signed_url": sign_url(url_to_sign)}
+
+    keys = event.get("keys", [])
+    if keys:
+        res = {}
+        for k in keys:
+            url_to_sign = f"{CUSTOM_DOMAIN}/{k}"
+            res[k] = {"signed_url": sign_url(url_to_sign)}
+        print(res)
+        return res

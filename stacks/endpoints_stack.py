@@ -101,7 +101,7 @@ class EndpointsStack(Stack):
             code=_lambda.Code.from_asset(
                 f"{os.path.dirname(__file__)}/../lambdas/app_endpoints/queries/query"
             ),
-            timeout=Duration.seconds(10),
+            timeout=Duration.seconds(60),
             environment={
                 "CORE_TABLE_NAME": core_table.table_name,
                 "BUCKET_NAME": core_bucket.bucket_name,

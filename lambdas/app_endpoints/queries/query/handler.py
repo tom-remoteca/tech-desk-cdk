@@ -16,25 +16,80 @@ BUCKET = os.environ["BUCKET_NAME"]
 
 
 def add_attachment_links(query_data):
-    # Add signed urls to attachments
-    for attachment in query_data.get("attachments", []):
-        resp = _lambda.invoke(
-            FunctionName=os.environ["SIGNED_URL_GENERATOR_FUNCTION_NAME"],
-            Payload=json.dumps({"key": attachment["file_key"]}),
-        )
-        body = json.loads(resp["Payload"].read())
-        attachment["signed_url"] = body["signed_url"]
+    # Collect keys from attachments and report assets
+    attachment_keys = [
+        attachment["file_key"] for attachment in query_data.get("attachments", [])
+    ]
+    asset_keys = [
+        asset["asset_key"]
+        for asset in query_data.get("report_details", {}).get("assets", [])
+    ]
+    all_keys = attachment_keys + asset_keys
 
-    # Add signed urls to report assets
-    for asset in query_data.get("report_details", {}).get("assets", []):
+    print(all_keys)
+    # Make a single lambda call if there are keys to process
+    if all_keys:
         resp = _lambda.invoke(
             FunctionName=os.environ["SIGNED_URL_GENERATOR_FUNCTION_NAME"],
-            Payload=json.dumps({"key": asset["asset_key"]}),
+            Payload=json.dumps({"keys": all_keys}),
         )
         body = json.loads(resp["Payload"].read())
-        asset["signed_url"] = body["signed_url"]
+        print(body)
+        # Update each attachment with its signed URL
+        for attachment in query_data.get("attachments", []):
+            file_key = attachment["file_key"]
+            if file_key in body:
+                attachment["signed_url"] = body[file_key]["signed_url"]
+
+        # Update each asset with its signed URL
+        for asset in query_data.get("report_details", {}).get("assets", []):
+            asset_key = asset["asset_key"]
+            if asset_key in body:
+                asset["signed_url"] = body[asset_key]["signed_url"]
 
     return query_data
+
+
+# def add_attachment_links(query_data):
+#     # Collect all keys from the attachments
+#     keys = [attachment["file_key"] for attachment in query_data.get("attachments", [])]
+
+#     # Make a single lambda call if there are keys to process
+#     if keys:
+#         resp = _lambda.invoke(
+#             FunctionName=os.environ["SIGNED_URL_GENERATOR_FUNCTION_NAME"],
+#             Payload=json.dumps({"keys": keys}),
+#         )
+#         body = json.loads(resp["Payload"].read())
+
+#         # Update each attachment with its signed URL
+#         for attachment in query_data.get("attachments", []):
+#             file_key = attachment["file_key"]
+#             if file_key in body:
+#                 attachment["signed_url"] = body[file_key]["signed_url"]
+
+#     # Collect all keys from the report assets
+
+#     asset_keys = [
+#         asset["asset_key"]
+#         for asset in query_data.get("report_details", {}).get("assets", [])
+#     ]
+
+#     # Make a single lambda call if there are asset keys to process
+#     if asset_keys:
+#         resp = _lambda.invoke(
+#             FunctionName=os.environ["SIGNED_URL_GENERATOR_FUNCTION_NAME"],
+#             Payload=json.dumps({"keys": asset_keys}),
+#         )
+#         body = json.loads(resp["Payload"].read())
+
+#         # Update each asset with its signed URL
+#         for asset in query_data.get("report_details", {}).get("assets", []):
+#             asset_key = asset["asset_key"]
+#             if asset_key in body:
+#                 asset["signed_url"] = body[asset_key]["signed_url"]
+
+#     return query_data
 
 
 def response(status_code, body={}):

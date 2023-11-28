@@ -208,6 +208,7 @@ class CoreStack(Stack):
             "GeneratePresignedUrlFunction",
             runtime=_lambda.Runtime.PYTHON_3_8,
             handler="handler.handler",
+            memory_size=512,
             code=_lambda.Code.from_asset(
                 f"{os.path.dirname(__file__)}/../lambdas/generate_presigned_url"
             ),
