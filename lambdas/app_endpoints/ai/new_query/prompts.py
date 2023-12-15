@@ -86,6 +86,14 @@ models = {
             "https://techdesk-ai-assets.s3.eu-west-2.amazonaws.com/ifrs-17-insurance-contracts.pdf": "IFRS 17",
         },
     },
+    "IAS 12": {
+        "kwip_source": "ias12",
+        "source_urls": {
+            "https://techdesk-ai-assets.s3.eu-west-2.amazonaws.com/IAS-12-income-taxes+-+Illustrative+Examples.pdf": "IAS 12 Illustrative Examples",
+            "https://techdesk-ai-assets.s3.eu-west-2.amazonaws.com/IAS-12-income-taxes+-+Basis+for+conclusions.pdf": "IAS 12 Basis for Conclusions",
+            "https://techdesk-ai-assets.s3.eu-west-2.amazonaws.com/IAS-12-income-taxes+-+Standard.pdf": "IAS 12",
+        },
+    },
     "Income Tax Legislation - UK": {
         "kwip_source": "IncomeTaxUK",
         "source_urls": {
